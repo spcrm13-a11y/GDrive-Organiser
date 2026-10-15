@@ -1,0 +1,126 @@
+# ainie-knowfind -- https://knowfind.tail2227aa.ts.net/
+#
+# Shape follows SP-nginx/docs/per-app-hostnames.md, the standard for all new
+# apps on theguardian, and mirrors the live deskint stack:
+#
+#   browser --TLS--> knowfind-tailscale   (Tailscale Serve, own LE cert)
+#                        | plain HTTP, smartplanet network
+#                        v
+#                    ainie-knowfind-edge  (auth_request -> outpost)
+#                        |
+#                        v
+#                    ainie-knowfind-app
+#
+# The app never sees a credential: end-user authentication happens entirely in
+# the edge's Authentik forward-auth check. Identity arrives as X-Authentik-*
+# headers plus the X-Knowfind-Authenticated marker.
+#
+# All services sit on the external `smartplanet` network so they resolve each
+# other by container name, per fleet convention -- do not add isolated
+# per-service networks, and this file does not create that network.
+#
+# Secrets resolve from a sibling `.env`, which deploy/deploy-knowfind-guardian.sh
+# generates from Infisical. Never commit a real value here.
+
+name: ainie-knowfind
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ainie-knowfind-app
+    container_name: ainie-knowfind-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?GEMINI_API_KEY missing -- run deploy/deploy-knowfind-guardian.sh}
+      APP_URL: ${APP_URL:-https://knowfind.tail2227aa.ts.net}
+      # Telemetry per SMARTPLANET_APP_STANDARD.md: /health is published to
+      # smartplanet/telemetry/knowfind every 60s for the telemetry-listener.
+      MQTT_HOST: ${MQTT_HOST:-100.102.174.92}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USER: ${MQTT_USER:-smartplanet}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+    # Loopback only. A binding on theguardian's public IP (82.165.242.39) is a
+    # hard stop -- see SP-nginx/external-exposure-audit.md. This port exists
+    # for debugging; real traffic arrives through the edge over the network.
+    ports:
+      - "127.0.0.1:4011:3000"
+    networks:
+      - smartplanet
+
+  edge:
+    image: nginx:alpine
+    container_name: ainie-knowfind-edge
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    # No host port: the only thing that reaches this is the tailscale sidecar,
+    # over the smartplanet network.
+    depends_on:
+      - app
+      - outpost
+    networks:
+      - smartplanet
+
+  outpost:
+    image: ghcr.io/goauthentik/proxy:2026.5.6
+    container_name: knowfind-authentik-outpost
+    restart: unless-stopped
+    environment:
+      AUTHENTIK_HOST: ${AUTHENTIK_HOST:-http://authentik-server-1:9000}
+      # The Authentik LOGIN host, not this app's host. Pointing it at
+      # knowfind.tail2227aa.ts.net sends the browser to
+      # /application/o/authorize/ on a hostname that does not serve Authentik,
+      # which loops until curl gives up at 50 redirects (seen 2026-10-15).
+      # Every live outpost on this host uses theguardian; auth.ai-nie.com is
+      # the plan of record (SP-nginx/passkey-auth-hosts-20261012.md,
+      # sp_operations.Tasks 3349) but does not resolve yet. When it lands, this
+      # and the provider's external_host move together -- and note that moving
+      # the login hostname invalidates every passkey enrolled against the old
+      # one.
+      AUTHENTIK_HOST_BROWSER: ${AUTHENTIK_HOST_BROWSER:-https://theguardian.tail2227aa.ts.net}
+      AUTHENTIK_INSECURE: "true"
+      AUTHENTIK_TOKEN: ${AUTHENTIK_TOKEN:?AUTHENTIK_TOKEN missing -- create the KnowFind outpost in Authentik first}
+    networks:
+      # Two networks, both required. The edge reaches the outpost over
+      # `smartplanet`, but authentik-server-1 itself is attached ONLY to
+      # `sp_docucenter_internal` (a historical name for what is now the shared
+      # Authentik network on this host) -- without it the outpost cannot
+      # resolve its own server, every auth_request answers 502, and the edge
+      # turns that into a bare 500 with nothing in its log but "Connection
+      # refused". The live deskint outpost is on both for the same reason.
+      - smartplanet
+      - authentik_internal
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: knowfind-tailscale
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?TS_AUTHKEY missing -- mint an ephemeral reusable key for the knowfind node}
+      TS_HOSTNAME: knowfind
+      # NOT optional. Without it containerboot runs tailscaled with `mem:`
+      # state: the node re-registers on every restart and the `tailscale serve`
+      # config is lost, so https://knowfind.tail2227aa.ts.net stops answering
+      # with a connection refused and no log line anywhere explaining why.
+      # Measured fleet-wide on 2026-10-04; see per-app-hostnames.md traps.
+      TS_STATE_DIR: /var/lib/tailscale
+    volumes:
+      - knowfind_ts_state:/var/lib/tailscale
+    networks:
+      - smartplanet
+
+volumes:
+  knowfind_ts_state:
+
+networks:
+  smartplanet:
+    external: true
+  # Aliased because the real network name is a historical artifact: it was
+  # created by the Docucenter stack and the Authentik server never moved off it.
+  authentik_internal:
+    external: true
+    name: sp_docucenter_internal

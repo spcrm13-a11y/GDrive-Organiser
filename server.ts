@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 
+import { registerHealth, startTelemetry } from './health.js';
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,6 +16,10 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '15mb' }));
+
+// Registered before the production catch-all below, which would otherwise
+// answer /health with index.html.
+registerHealth(app, Boolean(process.env.GEMINI_API_KEY));
 
 // Initialize GoogleGenAI SDK
 const apiKey = process.env.GEMINI_API_KEY || '';
@@ -530,6 +536,7 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Enterprise Document Classifier server running on http://0.0.0.0:${PORT}`);
+    startTelemetry(Boolean(apiKey));
   });
 }
 
