@@ -1,6 +1,8 @@
 {
-  "name": "DomainOrganizer AI - Autonomous Document Classifier",
+  "name": "Ainie ORganizer - Autonomous Document Classifier",
   "description": "Autonomous enterprise document classifier and Google Drive workspace organizer with strict 9-domain taxonomy and Reality Isolation compliance.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

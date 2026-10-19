@@ -1,9 +1,11 @@
 import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import http from 'http';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, Modality, LiveServerMessage } from '@google/genai';
+import { WebSocketServer, WebSocket } from 'ws';
 
 dotenv.config();
 
@@ -501,11 +503,113 @@ Full Content: ${doc.fullText ? doc.fullText.substring(0, 2000) : 'N/A'}`;
   }
 });
 
+// Server API: Multi-turn Chat Endpoint
+app.post('/api/chat', async (req: Request, res: Response) => {
+  try {
+    const { messages, model = 'gemini-3.8-flash' } = req.body;
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      res.status(400).json({ error: 'Messages array is required.' });
+      return;
+    }
+
+    const systemInstruction = `You are the autonomous enterprise workspace organizer & document classifier AI copilot for DomainOrganizer AI.
+Your primary role is to assist users with enterprise document classification, taxonomy clarification, and Google Drive organization.
+
+TAXONOMY & OPERATIONAL DOMAINS:
+1. Personal: Tax documents (GPM311, freelancer filings, VAT receipts), identity (passports, IDs), medical records, private travel/shipping, utilities, household expenses.
+2. Financing/Investment: Budgets, cap tables, term sheets, valuation models, funding proposals, P&L, revenue shares.
+3. Smartplanet: SmartPlanet AI architecture, social media initiative, MQTT spine, enforcer mechanics, WOPR, NORAD control, DEFCON status, The Farm, The Factory.
+4. Ainie: Personal AI assistant, digital twin, Genesis Protocol, AgentDash, AgentFrame, reality isolation layers, multi-space OS, HUD, .life domains (Faulpelz, Tinginys, Flemmard).
+5. Adaptive Living: Assisted living, ergonomic housing, accessibility systems, smart home automation, wellness infrastructure.
+6. Masonic: Lodge administration, member registries, fraternal records, Grand Lodge correspondence, visitations, rituals.
+7. AI Code Development: Repositories, Git, GitHub, Docker, MCP tools, Python pipelines, n8n automations, DORA/SPACE metrics.
+8. Strategy: Enterprise roadmaps, operating models, Balanced Scorecards (BSC), architectural governance, organizational design.
+9. Others: Documents not clearly in the 8 primary domains.
+
+CRITICAL PRIORITY RULE (REALITY ISOLATION):
+- "Personal" takes absolute precedence over all other categories. If a document contains personal tax filings, medical data, passports, private travel/shipping receipts, utility bills, or household records, it MUST be classified as "Personal", regardless of whether business or technical keywords also appear.
+
+Answer questions directly, give concise rationales, explain why specific documents match a category, and assist users in organizing and filtering their workspace documents.`;
+
+    const contents = messages.map((m: { role: string; content: string }) => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }],
+    }));
+
+    const allowedModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-4-argon'];
+    const selectedModel = allowedModels.includes(model) ? model : 'gemini-3.8-flash';
+
+    if (apiKey) {
+      try {
+        const chatCall = ai.models.generateContent({
+          model: selectedModel,
+          contents,
+          config: {
+            systemInstruction,
+            temperature: 0.3,
+          },
+        });
+
+        const geminiRes = await withTimeout(chatCall, 12000);
+        const replyText = geminiRes.text?.trim() || 'No response generated.';
+
+        res.json({
+          reply: replyText,
+          modelUsed: selectedModel,
+        });
+        return;
+      } catch (err: any) {
+        console.warn('Chat Gemini call failed, using intelligent fallback:', err?.message);
+      }
+    }
+
+    // Intelligent fallback responder
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+    const qLower = lastUserMessage.toLowerCase();
+    let reply = `I am your Enterprise Document Classifier Copilot. I can help explain the 9 operational domains, verify Reality Isolation, or inspect any document snippet.`;
+
+    if (qLower.includes('reality isolation') || qLower.includes('priority rule')) {
+      reply = `**Reality Isolation Critical Priority Rule**:
+Under our governance framework, **Personal takes absolute precedence** over all other operational domains. If a document contains personal tax filings (e.g. GPM311, freelancer VAT receipts), identity records (passports, national IDs), clinical medical data, private travel/shipping receipts, or utility bills, it is strictly routed to the **Personal** domain, even if accompanied by Dockerfiles, cap table numbers, or strategy roadmaps. This prevents confidential personal data from leaking into enterprise systems.`;
+    } else if (qLower.includes('gpm311') || qLower.includes('tax')) {
+      reply = `**GPM311 Tax Filing**:
+Form GPM311 is the annual personal income and freelance tax declaration. Even if it contains Python scripts for currency conversion or container logs, the **Reality Isolation** rule immediately triggers to classify it as **Personal** to safeguard personal financial and tax records.`;
+    } else if (qLower.includes('smartplanet') || qLower.includes('ainie')) {
+      reply = `**Smartplanet vs Ainie**:
+- **Smartplanet**: Focuses on platform-level infrastructure, MQTT messaging spines, enforcer mechanics, and server architecture (WOPR, NORAD control, DEFCON status, The Farm, The Factory).
+- **Ainie**: Dedicated to the personal AI assistant and digital twin architecture, Genesis Protocol, AgentDash, AgentFrame, multi-space OS HUD, and localized domains (.life variants such as Faulpelz and Tinginys).`;
+    } else if (qLower.includes('domain') || qLower.includes('categories') || qLower.includes('taxonomy')) {
+      reply = `The workspace operates on **9 strict operational domains**:
+1. **Personal** (Absolute Precedence via Reality Isolation)
+2. **Financing/Investment**
+3. **Smartplanet**
+4. **Ainie**
+5. **Adaptive Living**
+6. **Masonic**
+7. **AI Code Development**
+8. **Strategy**
+9. **Others**`;
+    } else if (qLower.includes('search') || qLower.includes('filter')) {
+      reply = `You can search and filter documents in the **Drive Workspace** tab using the search bar. It matches document titles, snippet contents, and tags in real time, with instant highlighting of matched keywords.`;
+    }
+
+    res.json({
+      reply,
+      modelUsed: `${selectedModel} (rules-engine fallback)`,
+    });
+  } catch (error: any) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: error?.message || 'Chat service failed.' });
+  }
+});
+
 // Server API: Status endpoint
 app.get('/api/status', (req: Request, res: Response) => {
   res.json({
     status: 'online',
     model: 'gemini-3.8-flash',
+    liveModel: 'gemini-3.8-live',
     hasApiKey: Boolean(apiKey),
     supportedDomains: OPERATIONAL_DOMAINS,
     realityIsolationPriority: 'Active (Absolute Precedence)',
@@ -513,6 +617,214 @@ app.get('/api/status', (req: Request, res: Response) => {
 });
 
 async function startServer() {
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ noServer: true });
+
+  // Handle WebSocket upgrade specifically for /live
+  server.on('upgrade', (request, socket, head) => {
+    const parsedUrl = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+    if (parsedUrl.pathname === '/live' || parsedUrl.pathname === '/api/live') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
+
+  // Manage Live API Realtime Voice Sessions with gemini-3.8-live
+  wss.on('connection', async (clientWs: WebSocket, request: http.IncomingMessage) => {
+    console.log('[Live API] Client connected to /live');
+
+    let session: any = null;
+    let isSessionAlive = true;
+
+    const setupLiveSession = async (voiceName = 'Zephyr') => {
+      if (!apiKey) {
+        clientWs.send(
+          JSON.stringify({
+            type: 'error',
+            message: 'GEMINI_API_KEY is not configured on the server. Please add your key to use Live voice conversations.',
+          })
+        );
+        return;
+      }
+
+      try {
+        const liveSession = await ai.live.connect({
+          model: 'gemini-3.8-live',
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voiceName || 'Zephyr',
+                },
+              },
+            },
+            systemInstruction: `You are Ainie Voice Copilot, the autonomous voice assistant for Ainie Organizer and enterprise document classification.
+You assist users with real-time conversational classification, queries about their document taxonomy, and Google Drive organization.
+
+OPERATIONAL TAXONOMY (9 STRICT DOMAINS):
+1. Personal: Personal tax returns (e.g., GPM311, freelancer filings, VAT receipts), identity (passports, national IDs), clinical medical data, personal travel/shipping receipts, household utilities.
+2. Financing/Investment: Budgets, cap tables, term sheets, valuation models, funding proposals, P&L, revenue share models.
+3. Smartplanet: SmartPlanet AI architecture, social media initiative, MQTT spine, enforcer mechanics, WOPR/NORAD control, DEFCON status, The Farm, The Factory.
+4. Ainie: Personal AI assistant, digital twin, Genesis Protocol, AgentDash, AgentFrame, reality isolation layers, multi-space OS, HUD, .life domains (Faulpelz, Tinginys, Flemmard).
+5. Adaptive Living: Assisted living, ergonomic housing, accessibility systems, smart home automation, wellness infrastructure.
+6. Masonic: Lodge administration, member registries, fraternal records, Grand Lodge correspondence, visitations, rituals.
+7. AI Code Development: Repositories, Git, GitHub, Docker, MCP tools, Python pipelines, n8n automations, DORA/SPACE metrics.
+8. Strategy: Enterprise roadmaps, operating models, Balanced Scorecards (BSC), architectural governance, organizational design.
+9. Others: Documents not clearly in the 8 primary domains.
+
+CRITICAL PRIORITY RULE (REALITY ISOLATION):
+"Personal" takes absolute precedence over all other categories. If a document contains personal tax filings (e.g. GPM311), medical data, passports, private travel receipts, or utility bills, it MUST be classified as "Personal", regardless of whether business, financial, or technical keywords also appear.
+
+STYLE:
+- Speak naturally, warmly, and concisely (1 to 3 spoken sentences per turn).
+- Be crisp and direct when asked which category a document belongs to.
+- Immediately cite the Reality Isolation rule if personal data or tax documents are mentioned.`,
+          },
+          callbacks: {
+            onopen: () => {
+              console.log('[Live API] Gemini Live session connected');
+              if (clientWs.readyState === WebSocket.OPEN) {
+                clientWs.send(
+                  JSON.stringify({
+                    type: 'session_ready',
+                    model: 'gemini-3.8-live',
+                    voice: voiceName,
+                  })
+                );
+              }
+            },
+            onmessage: (message: LiveServerMessage) => {
+              if (clientWs.readyState !== WebSocket.OPEN) return;
+
+              const parts = message.serverContent?.modelTurn?.parts;
+              if (parts) {
+                for (const part of parts) {
+                  if (part.inlineData?.data) {
+                    clientWs.send(
+                      JSON.stringify({
+                        type: 'audio',
+                        audio: part.inlineData.data,
+                        mimeType: part.inlineData.mimeType || 'audio/pcm;rate=24000',
+                      })
+                    );
+                  }
+                  if (part.text) {
+                    clientWs.send(
+                      JSON.stringify({
+                        type: 'transcript',
+                        text: part.text,
+                        role: 'model',
+                      })
+                    );
+                  }
+                }
+              }
+
+              if (message.serverContent?.interrupted) {
+                clientWs.send(JSON.stringify({ type: 'interrupted' }));
+              }
+
+              if (message.serverContent?.turnComplete) {
+                clientWs.send(JSON.stringify({ type: 'turn_complete' }));
+              }
+            },
+            onerror: (err: any) => {
+              console.error('[Live API] Session error:', err);
+              if (clientWs.readyState === WebSocket.OPEN) {
+                clientWs.send(
+                  JSON.stringify({
+                    type: 'error',
+                    message: err?.message || 'Gemini Live API error',
+                  })
+                );
+              }
+            },
+            onclose: () => {
+              console.log('[Live API] Gemini Live session closed');
+              if (clientWs.readyState === WebSocket.OPEN) {
+                clientWs.send(JSON.stringify({ type: 'session_closed' }));
+              }
+            },
+          },
+        });
+
+        session = liveSession;
+      } catch (err: any) {
+        console.error('[Live API] Failed to initialize live session:', err);
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.send(
+            JSON.stringify({
+              type: 'error',
+              message: `Could not connect to gemini-3.8-live: ${err?.message || 'Connection error'}`,
+            })
+          );
+        }
+      }
+    };
+
+    // Initialize session with default voice
+    await setupLiveSession('Zephyr');
+
+    clientWs.on('message', async (raw: Buffer) => {
+      try {
+        const data = JSON.parse(raw.toString());
+
+        if (data.type === 'init' && data.voice) {
+          if (session) {
+            try { session.close(); } catch (e) {}
+          }
+          await setupLiveSession(data.voice);
+          return;
+        }
+
+        if (data.type === 'audio' && data.audio) {
+          if (session && typeof session.sendRealtimeInput === 'function') {
+            session.sendRealtimeInput({
+              audio: {
+                data: data.audio,
+                mimeType: 'audio/pcm;rate=16000',
+              },
+            });
+          }
+        } else if (data.type === 'text' && data.text) {
+          if (session && typeof session.sendClientContent === 'function') {
+            session.sendClientContent({
+              turns: [
+                {
+                  role: 'user',
+                  parts: [{ text: data.text }],
+                },
+              ],
+              turnComplete: true,
+            });
+          }
+        }
+      } catch (err: any) {
+        console.error('[Live API] Error handling client packet:', err);
+      }
+    });
+
+    clientWs.on('close', () => {
+      isSessionAlive = false;
+      if (session) {
+        try {
+          session.close();
+        } catch (e) {}
+      }
+    });
+
+    clientWs.on('error', (err) => {
+      console.warn('[Live API] Client WebSocket error:', err.message);
+      if (session) {
+        try {
+          session.close();
+        } catch (e) {}
+      }
+    });
+  });
+
   // Vite in dev mode
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -528,8 +840,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Enterprise Document Classifier server running on http://0.0.0.0:${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Enterprise Document Classifier server running with Live API on http://0.0.0.0:${PORT}`);
   });
 }
 
