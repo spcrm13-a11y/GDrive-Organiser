@@ -6,3 +6,15 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# --- agent/ (Python Drive backend) ---
+agent/venv/
+agent/.venv-auth/
+agent/__pycache__/
+agent/**/__pycache__/
+agent/credentials.json
+agent/client_secret*.json
+agent/token.json
+agent/ledger/*.jsonl
+agent/reports/*.json
+agent/reports/*.md

@@ -10,6 +10,36 @@
 
 ---
 
+## Version 26.10.20-007
+
+**Release Date:** 2026-10-20
+**Status:** Done
+
+- **[User Request] Absorbed the real-Drive backend into this repo as `agent/`.**
+  Until now this repo was a classifier UI over `src/data/mockCorpus.ts` with no
+  Google dependency at all, while a separate `gdrive-agent` project held the
+  Python daemon that actually reads and reparents Drive files. Both defined the
+  same nine-category taxonomy independently, which would have drifted. They now
+  share one repo and one `GDrive-Organiser` remote.
+
+  `agent/` is **dry-run by default** — no `files().create` or `files().update`
+  is reachable without `--apply`. Every move is recorded to an fsynced ledger
+  *before* it happens and is undoable via `--revert`. 16 offline tests
+  (`agent/tests/`, stub Drive service, no credentials needed) assert exactly
+  those properties. Its own change history is in `agent/versions.md`.
+
+  Note the two halves still disagree on the model: the UI uses
+  `gemini-3.8-flash`, the backend defaults to `gemini-2.5-flash` from its
+  source spec, now overridable via the `GEMINI_MODEL` env var. **The taxonomy
+  is still declared twice** — once in `src/types/classifier.ts`, once in
+  `agent/agent_daemon.py`. Unifying it is the obvious next step and was
+  deliberately not folded into this commit.
+
+  The agent is **not yet operational**: OAuth consent is outstanding, pending a
+  new Google Desktop client. Nothing is scheduled — no daemon, no cron, no
+  timer. Secrets stay in Infisical (project `gdrive-agent`); nothing sensitive
+  is committed.
+
 ## Version 26.10.15-006
 
 **Release Date:** 2026-10-15

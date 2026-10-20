@@ -1,0 +1,16 @@
+# Secrets and OAuth material — never commit
+.env
+.env.*
+!.env.example
+credentials.json
+client_secret*.json
+token.json
+*.pem
+
+# Runtime state
+venv/
+__pycache__/
+*.pyc
+ledger/*.jsonl
+reports/*.json
+reports/*.md
