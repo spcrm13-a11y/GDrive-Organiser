@@ -22,12 +22,18 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-VERSION = "11"
+VERSION = "12"
 AGENT_TAG = "MoneypenneyAgent"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Sibling project ainie-knowfind (same taxonomy, mock corpus) runs
 # gemini-3.8-flash. Override here rather than editing the source.
+# Backend: "ollama" (default) keeps personal documents on the tailnet and has
+# no quota; "gemini" is faster but free-tier capped at 20 requests/day/model.
+CLASSIFIER_BACKEND = os.environ.get("CLASSIFIER_BACKEND", "ollama").lower()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://100.113.72.52:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")
+OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "180"))
 RETRYABLE = {429, 500, 502, 503, 504}
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -190,6 +196,44 @@ Snippet: {snippet}
 Return JSON with keys: category, confidence, reason."""
 
 
+def call_ollama(name, snippet=""):
+    """Classify locally. No quota, and nothing leaves the tailnet.
+
+    That second property is the point: the 'Personal' domain is tax documents,
+    passports and medical records, so keeping them off a third-party API is
+    consistent with the taxonomy's own Reality Isolation rule.
+    """
+    prompt = PROMPT.format(domains=_domain_brief(), name=name, snippet=snippet)
+    body = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False,
+            "format": "json", "options": {"temperature": 0.1}}
+
+    def _post():
+        r = requests.post(f"{OLLAMA_HOST.rstrip('/')}/api/generate",
+                          json=body, timeout=OLLAMA_TIMEOUT)
+        if r.status_code in RETRYABLE:
+            raise requests.RequestException(f"HTTP {r.status_code}")
+        r.raise_for_status()
+        return r
+
+    try:
+        resp = _post_with_backoff(_post)
+        return json.loads(resp.json()["response"]), False
+    except Exception as e:
+        log(f"    [!] OLLAMA FAILURE for {name!r}: {type(e).__name__}: {e}")
+        return {"category": "Others", "reason": f"BACKEND_FAILURE: {e}",
+                "confidence": 0.0}, True
+
+
+def classify(api_key, name, snippet=""):
+    """Dispatch to the configured backend."""
+    if CLASSIFIER_BACKEND == "ollama":
+        return call_ollama(name, snippet)
+    if CLASSIFIER_BACKEND == "gemini":
+        return call_gemini(api_key, name, snippet)
+    sys.exit(f"[!] Unknown CLASSIFIER_BACKEND {CLASSIFIER_BACKEND!r}. "
+             f"Use 'ollama' or 'gemini'.")
+
+
 def call_gemini(api_key, name, snippet=""):
     """Classify one file. Returns (verdict_dict, api_failed_bool)."""
     if not api_key:
@@ -346,8 +390,8 @@ def classify_batch(service, api_key, args):
     rows, api_failures = [], 0
     for f in files:
         try:
-            verdict, failed = call_gemini(api_key, f["name"],
-                                          f.get("description", ""))
+            verdict, failed = classify(api_key, f["name"],
+                                       f.get("description", ""))
         except QuotaExhausted as q:
             hours = q.retry_after_s / 3600.0
             log("")
@@ -509,12 +553,15 @@ def main():
         return
 
     api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
+    if CLASSIFIER_BACKEND == "gemini" and not api_key:
         log("[!] GEMINI_API_KEY not set - every file will fall back to "
             "'Others'. Load it first: source scripts/infisical-env.sh")
 
     mode = "APPLY (will modify Drive)" if args.apply else "DRY-RUN (no changes)"
+    engine = (f"ollama {OLLAMA_MODEL} @ {OLLAMA_HOST}"
+              if CLASSIFIER_BACKEND == "ollama" else f"gemini {GEMINI_MODEL}")
     log(f"[*] MoneypenneyAgent v{VERSION} - {mode}")
+    log(f"[*] Classifier: {engine}")
 
     rows = classify_batch(service, api_key, args)
     if not rows:

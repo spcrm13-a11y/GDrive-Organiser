@@ -1,5 +1,41 @@
 # versions.md — gdrive-agent (MoneypenneyAgent)
 
+## 12 — 2026-10-22
+
+`[User Request]` Pluggable classifier backend, defaulting to a **local model**.
+
+`CLASSIFIER_BACKEND` selects `ollama` (default) or `gemini`. The local path
+calls `qwen2.5:7b-instruct` on deepthought01 over the tailnet
+(`OLLAMA_HOST`, `OLLAMA_MODEL`, `OLLAMA_TIMEOUT`).
+
+Why local is the default, not a fallback:
+
+- **No quota.** The Gemini free tier allows 20 requests/day/model, which
+  cannot organise a Drive of any size. Measured alternatives: a Google AI Pro
+  subscription does **not** raise Gemini *API* limits (tiers come from Cloud
+  billing, not consumer subscriptions); `gemini` CLI via Code Assist would
+  (~1000/day) but is unauthenticated on thevault and needs an interactive
+  browser login; `claude` CLI is not logged in and this org has Claude Code
+  subscription access disabled.
+- **Privacy.** The `Personal` domain is explicitly tax documents, passports
+  and medical records. Classifying those on a third-party API contradicts the
+  Reality Isolation rule the taxonomy itself encodes. Local inference keeps
+  them on the tailnet.
+- **It works.** `qwen2.5:7b-instruct` classified the real file
+  `SteuerTom Dashboard` as `Personal` at 0.85 with correct tax reasoning.
+  ~19s/file on deepthought01 (8 CPU cores, 30GB, no GPU): ~4 min for 12 files,
+  ~5h for 1000. Slower than Gemini, but unmetered.
+
+A backend failure is flagged with `BACKEND_FAILURE:` and counted, never
+disguised as a low-confidence `Others` — same rule as the Gemini path.
+
+`[Bug Fix]` Six existing tests patched `call_gemini`, but `classify_batch` now
+dispatches through `classify()`. They were falling through to the **real local
+model**: the suite took 49 seconds of live inference while pretending to be
+offline. Repointed at `classify()`, and added a guard test asserting
+`classify_batch` never reaches a backend directly. Suite is back to 0.09s,
+28 tests.
+
 ## 11 — 2026-10-21
 
 `[Bug Fix]` Stop the batch when the daily Gemini quota is gone, instead of

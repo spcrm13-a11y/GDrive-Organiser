@@ -10,6 +10,8 @@ import os
 import sys
 import tempfile
 import unittest
+
+import requests
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -126,7 +128,7 @@ class ClassificationTests(unittest.TestCase):
         f = FakeFiles([{"files": [{"id": "1", "name": "x.pdf", "parents": ["p"]}]}]
                       + [{"files": []}] * len(ad.CATEGORIES))
         args = mock.Mock(days=425, limit=5, server_filter=False, apply=False)
-        with mock.patch.object(ad, "call_gemini",
+        with mock.patch.object(ad, "classify",
                                return_value=({"category": "Nonsense",
                                               "confidence": 0.9}, False)):
             rows = ad.classify_batch(FakeService(f), "k", args)
@@ -136,7 +138,7 @@ class ClassificationTests(unittest.TestCase):
         f = FakeFiles([{"files": [{"id": "1", "name": "x.pdf", "parents": ["p"]}]}]
                       + [{"files": []}] * len(ad.CATEGORIES))
         args = mock.Mock(days=425, limit=5, server_filter=False, apply=False)
-        with mock.patch.object(ad, "call_gemini",
+        with mock.patch.object(ad, "classify",
                                return_value=({"category": "Others",
                                               "confidence": 0.0,
                                               "reason": "API_FAILURE: boom"}, True)):
@@ -219,7 +221,7 @@ class DryRunIsInertTests(unittest.TestCase):
         f = FakeFiles([files] + [{"files": []}] * len(ad.CATEGORIES))
         args = mock.Mock(days=425, limit=25, server_filter=False, apply=False)
 
-        with mock.patch.object(ad, "call_gemini",
+        with mock.patch.object(ad, "classify",
                                return_value=({"category": "Personal",
                                               "confidence": 0.95,
                                               "reason": "invoice"}, False)):
@@ -264,6 +266,49 @@ class BackoffTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class BackendTests(unittest.TestCase):
+    def test_default_backend_is_local(self):
+        self.assertEqual(ad.CLASSIFIER_BACKEND, "ollama",
+                         "default must keep personal documents on the tailnet")
+
+    def test_dispatch_routes_to_ollama(self):
+        with mock.patch.object(ad, "CLASSIFIER_BACKEND", "ollama"), \
+             mock.patch.object(ad, "call_ollama",
+                               return_value=({"category": "Personal"}, False)) as o, \
+             mock.patch.object(ad, "call_gemini") as g:
+            ad.classify("key", "tax.pdf", "")
+        o.assert_called_once()
+        g.assert_not_called()
+
+    def test_dispatch_routes_to_gemini(self):
+        with mock.patch.object(ad, "CLASSIFIER_BACKEND", "gemini"), \
+             mock.patch.object(ad, "call_gemini",
+                               return_value=({"category": "Personal"}, False)) as g, \
+             mock.patch.object(ad, "call_ollama") as o:
+            ad.classify("key", "tax.pdf", "")
+        g.assert_called_once()
+        o.assert_not_called()
+
+    def test_unknown_backend_exits(self):
+        with mock.patch.object(ad, "CLASSIFIER_BACKEND", "nonsense"):
+            with self.assertRaises(SystemExit):
+                ad.classify("key", "x.pdf", "")
+
+    def test_ollama_failure_is_flagged_not_disguised(self):
+        with mock.patch.object(ad, "_post_with_backoff",
+                               side_effect=requests.RequestException("down")):
+            verdict, failed = ad.call_ollama("x.pdf")
+        self.assertTrue(failed)
+        self.assertEqual(verdict["category"], "Others")
+        self.assertIn("BACKEND_FAILURE", verdict["reason"])
+
+    def test_ollama_has_no_daily_quota_path(self):
+        """Ollama is local: a quota stop must never come from this backend."""
+        with mock.patch.object(ad, "_post_with_backoff",
+                               side_effect=requests.RequestException("x")):
+            ad.call_ollama("x.pdf")   # returns, does not raise QuotaExhausted
 
 
 class QuotaTests(unittest.TestCase):
@@ -321,8 +366,30 @@ class QuotaTests(unittest.TestCase):
                 return seq.pop(0)
             raise ad.QuotaExhausted("PerDay", "20", 33092)
 
-        with mock.patch.object(ad, "call_gemini", side_effect=fake_gemini):
+        with mock.patch.object(ad, "classify", side_effect=fake_gemini):
             rows = ad.classify_batch(FakeService(f), "key", args)
 
         self.assertEqual(len(rows), 2, "rows classified before the quota hit are kept")
         self.assertEqual(f.update_calls, [], "still a dry run")
+
+
+class NoNetworkInTestsTests(unittest.TestCase):
+    """classify_batch must be patched at classify(), not at a backend.
+
+    Patching call_gemini alone used to let batch tests fall through to the
+    real local model -- 49 seconds of live inference masquerading as a unit
+    test.
+    """
+
+    def test_batch_never_calls_a_backend_directly(self):
+        page = {"files": [{"id": "1", "name": "x.pdf", "parents": ["p"]}]}
+        f = FakeFiles([page] + [{"files": []}] * len(ad.CATEGORIES))
+        args = mock.Mock(days=425, limit=1, server_filter=False, apply=False)
+        with mock.patch.object(ad, "classify",
+                               return_value=({"category": "Others",
+                                              "confidence": 0.1}, False)), \
+             mock.patch.object(ad, "call_ollama") as o, \
+             mock.patch.object(ad, "call_gemini") as g:
+            ad.classify_batch(FakeService(f), "key", args)
+        o.assert_not_called()
+        g.assert_not_called()

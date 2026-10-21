@@ -16,6 +16,39 @@
 
 ---
 
+## Version 26.10.22-015
+
+**Release Date:** 2026-10-22
+**Status:** Done
+
+- **[User Request] The agent classifies on a local model by default.**
+  `CLASSIFIER_BACKEND` selects `ollama` (default) or `gemini`; the local path
+  runs `qwen2.5:7b-instruct` on deepthought01 over the tailnet. Full detail in
+  `agent/versions.md` entry 12.
+
+  Measured, not assumed, when asking whether a Pro subscription could lift the
+  Gemini cap:
+
+  | Option | Result |
+  |---|---|
+  | Gemini API key, free tier | 20 requests/day/model |
+  | Google AI Pro subscription | **does not affect API limits** — tiers come from Cloud billing, not consumer subscriptions |
+  | `gemini` CLI (Code Assist) | would give ~1000/day, but unauthenticated on thevault; needs interactive login |
+  | `claude` CLI | not logged in; this org has Claude Code subscription access disabled |
+  | Local Ollama | **unlimited**, ~19s/file, works today |
+
+  Beyond quota, the `Personal` domain is tax documents, passports and medical
+  records. Classifying those through a third-party API contradicts the Reality
+  Isolation rule the taxonomy encodes; local inference keeps them on the
+  tailnet.
+
+- **[Bug Fix] Six tests were secretly hitting the network.** They patched
+  `call_gemini` while `classify_batch` had moved to dispatching through
+  `classify()`, so they fell through to the real local model — 49 seconds of
+  live inference in a suite that claimed to be offline. Repointed, plus a new
+  guard test asserting `classify_batch` never reaches a backend directly.
+  28 tests, 0.09s.
+
 ## Version 26.10.20-014
 
 **Release Date:** 2026-10-21

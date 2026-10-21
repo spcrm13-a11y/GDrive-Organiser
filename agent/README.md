@@ -4,7 +4,7 @@ Classifies Google Drive files into nine categories with Gemini and files them
 into root-level folders. **Dry-run by default — it changes nothing unless you
 pass `--apply`.**
 
-Version: see [`versions.md`](versions.md). Current: **11**.
+Version: see [`versions.md`](versions.md). Current: **12**.
 
 ## Where it runs
 
@@ -39,10 +39,23 @@ isn't in the list falls back to `Others`.
    > your entire Drive**, which is what reparenting arbitrary files requires.
    > The token on thevault can therefore touch everything.
 
-3. **Gemini key.** Lives in Infisical, loaded at runtime:
+3. **Classifier backend.** Defaults to a **local** model on deepthought01 —
+   no quota, and personal documents never leave the tailnet.
+
+   | Env var | Default | |
+   |---|---|---|
+   | `CLASSIFIER_BACKEND` | `ollama` | or `gemini` |
+   | `OLLAMA_HOST` | `http://100.113.72.52:11434` | deepthought01 |
+   | `OLLAMA_MODEL` | `qwen2.5:7b-instruct` | ~19s/file on CPU |
+
+   The Gemini path needs a key from Infisical and is **capped at 20
+   requests/day/model** on the free tier:
    ```bash
    source scripts/infisical-env.sh
+   CLASSIFIER_BACKEND=gemini ./venv/bin/python agent_daemon.py
    ```
+   A Google AI Pro subscription does *not* raise Gemini API limits — only
+   linking a Cloud billing account does.
 
 ## Running it
 
