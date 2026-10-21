@@ -4,11 +4,33 @@
 > - Every change (whether feature request or bug fix) **MUST increment the version number by 1**.
 > - Every release entry **MUST explicitly specify** whether the change was triggered by `[User Request]`, `[Bug Fix]`, or `[Refactor / Maintenance]`.
 > - A version bump must update **every** place the version is stored: this file,
->   `package.json` `"version"`, and `src/version.ts` `APP_VERSION` (which is what
->   `/health` and the MQTT telemetry payload report). A changelog-only bump
->   silently desyncs from what the running app displays.
+>   `package.json` `"version"`, `src/version.ts` `APP_VERSION` (which is what
+>   `/health` and the MQTT telemetry payload report), and `package-lock.json`
+>   `"version"` — tracked since `26.10.20-010`, and it carries the version in
+>   **two** places, the top-level field and `packages[""].version`. A
+>   changelog-only bump silently desyncs from what the running app displays.
+> - The lockfile resyncs on its own: run `npm install` after editing
+>   `package.json`, rather than hand-editing it. Check with
+>   `npm pkg get version` against
+>   `python3 -c "import json;print(json.load(open('package-lock.json'))['version'])"`.
 
 ---
+
+## Version 26.10.20-012
+
+**Release Date:** 2026-10-21
+**Status:** Done
+
+- **[User Request] Added `package-lock.json` to the versioning policy** as a
+  fourth place the version is stored, now that the lockfile is tracked
+  (`26.10.20-010`).
+
+  Two details that make it easy to get wrong, so they are stated explicitly in
+  the policy block rather than left to be rediscovered: the lockfile carries
+  the version **twice** — the top-level `"version"` and `packages[""].version`
+  — and it should be resynced by running `npm install`, never hand-edited.
+  This exact desync happened at `26.10.20-011`: the lockfile was left at `010`
+  after the bump and only caught on inspection.
 
 ## Version 26.10.20-011
 
