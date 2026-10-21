@@ -10,6 +10,31 @@
 
 ---
 
+## Version 26.10.20-010
+
+**Release Date:** 2026-10-20
+**Status:** Done
+
+- **[User Request] `package-lock.json` is now tracked.** npm is the lockfile of
+  record. The Dockerfile runs plain `npm install`, which honours a lockfile
+  when one is present, so **the deployed image moves from floating versions to
+  pinned ones**. That is the point, but it is a real change in build behaviour:
+  a dependency will no longer silently pick up a new minor between builds.
+
+- **[Bug Fix] Dropped the unused `esbuild` devDependency.** Generating the
+  lockfile surfaced an `ERESOLVE` that the earlier lock-less installs had
+  masked: `75ddb50` added `esbuild@^0.25.0`, while `vite@8.3.5` declares a peer
+  of `^0.27.0 || ^0.28.0`. Nothing in the source imports esbuild — it appeared
+  only in `package.json` — and both vite and tsx bundle their own copy, so the
+  dependency was removed rather than bumped. Package count fell 337 -> 310.
+
+  Verified: `tsc --noEmit` and `vite build` both exit 0, 1673 modules
+  transformed, unchanged from 26.10.20-009.
+
+  Still outstanding: `bun.lock`, which `75ddb50` brought, is still tracked
+  alongside `package-lock.json`. Two lockfiles for two package managers will
+  drift. Only the npm one affects the Docker build.
+
 ## Version 26.10.20-009
 
 **Release Date:** 2026-10-20
