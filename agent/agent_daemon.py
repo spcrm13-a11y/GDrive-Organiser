@@ -22,25 +22,39 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-VERSION = "09"
+VERSION = "10"
 AGENT_TAG = "MoneypenneyAgent"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Sibling project ainie-knowfind (same taxonomy, mock corpus) runs
 # gemini-3.8-flash. Override here rather than editing the source.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
 RETRYABLE = {429, 500, 502, 503, 504}
 
-CATEGORIES = [
-    "Personal",
-    "Financing/Investment",
-    "Smartplanet",
-    "Ainie",
-    "Adaptive Living",
-    "Masonic",
-    "AI Code Development",
-    "Strategy",
-    "Others",
-]
+BASE = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_taxonomy():
+    """The nine domains come from taxonomy.json, shared with the UI.
+
+    Never re-list them here: the TypeScript side derives its literal union
+    from the same file via scripts/gen-taxonomy.mjs, so a name added in one
+    place reaches both. Looked up next to this script first (how it is
+    deployed) then one level up (how it sits in the repo).
+    """
+    for candidate in (os.path.join(BASE, "taxonomy.json"),
+                      os.path.join(os.path.dirname(BASE), "taxonomy.json")):
+        if os.path.exists(candidate):
+            with open(candidate) as fh:
+                return json.load(fh)["domains"], candidate
+    sys.exit(
+        "[!] taxonomy.json not found next to agent_daemon.py or one level up.\n"
+        "    It is the shared source of truth for the nine domains and must be\n"
+        "    deployed alongside the agent (scripts/deploy-to-vault.sh does this)."
+    )
+
+
+DOMAINS, TAXONOMY_PATH = load_taxonomy()
+CATEGORIES = [d["domain"] for d in DOMAINS]
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
@@ -110,8 +124,24 @@ def get_drive_service():
 # --------------------------------------------------------------------------
 # classification
 # --------------------------------------------------------------------------
-PROMPT = """You are an autonomous document classifier. Classify into EXACTLY ONE:
-{cats}.
+def _domain_brief():
+    """One line per domain, with the description and key signals the UI uses.
+
+    The original spec sent only the bare category names, which is a far weaker
+    prompt than the taxonomy already contains.
+    """
+    out = []
+    for d in DOMAINS:
+        signals = "; ".join(d.get("keySignals", []))
+        out.append(f"- {d['domain']}: {d['description']}"
+                   + (f" Typical signals: {signals}." if signals else ""))
+    return "\n".join(out)
+
+
+PROMPT = """You are an autonomous document classifier. Classify the document
+into EXACTLY ONE of these domains:
+
+{domains}
 
 CRITICAL: Taxes, invoices, medical records, passports, personal shipping/flights go to 'Personal'.
 
@@ -131,7 +161,7 @@ def call_gemini(api_key, name, snippet=""):
            f"{GEMINI_MODEL}:generateContent")
     body = {
         "contents": [{"parts": [{"text": PROMPT.format(
-            cats=", ".join(CATEGORIES), name=name, snippet=snippet)}]}],
+            domains=_domain_brief(), name=name, snippet=snippet)}]}],
         "generationConfig": {"temperature": 0.1,
                              "responseMimeType": "application/json"},
     }

@@ -1,7 +1,7 @@
 {
   "name": "ainie-organizer",
   "private": true,
-  "version": "26.10.20-012",
+  "version": "26.10.20-013",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -9,7 +9,8 @@
     "start": "tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "node scripts/gen-taxonomy.mjs --check && tsc --noEmit",
+    "taxonomy:gen": "node scripts/gen-taxonomy.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

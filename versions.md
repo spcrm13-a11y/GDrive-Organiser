@@ -16,6 +16,51 @@
 
 ---
 
+## Version 26.10.20-013
+
+**Release Date:** 2026-10-21
+**Status:** Done
+
+- **[Refactor / Maintenance] The nine-domain taxonomy now has one source:
+  `taxonomy.json`.** It had been declared in **five** places, not the two
+  previously noted: `src/types/classifier.ts` (the rich `OPERATIONAL_DOMAINS`
+  metadata), the `enum` inside `CLASSIFICATION_JSON_SCHEMA`, a second
+  `OPERATIONAL_DOMAINS` in `server.ts`, and `CATEGORIES` in
+  `agent/agent_daemon.py`.
+
+  TypeScript cannot derive a string-literal union from a JSON import — JSON
+  imports widen to `string` — so the literal list is **generated** into
+  `src/types/taxonomy.generated.ts` by `scripts/gen-taxonomy.mjs`. Everything
+  else derives from one of those two. `npm run lint` now runs
+  `gen-taxonomy.mjs --check` first, so a stale generated file fails the build
+  and therefore the pre-push hook. Verified by tampering with the generated
+  file: lint exits 1 and names the fix; restored, it exits 0.
+
+  `classifier.ts` keeps only presentation (colour, icon) and throws at startup
+  if `taxonomy.json` names a domain it has no colour for.
+
+  The agent reads `taxonomy.json` directly, looking next to itself first and
+  then one level up. `agent/taxonomy.json` is gitignored — the repo keeps one
+  copy, and `agent/scripts/deploy-to-vault.sh` ships it to thevault as a deploy
+  artefact.
+
+- **[Bug Fix] `gemini-2.5-flash` is retired; the default is now
+  `gemini-3.5-flash`.** The first real dry run failed **10 out of 10**
+  classifications with `404 Not Found` on that model. Measured against the live
+  API with Oliver's key: `gemini-2.5-flash` 404s (despite still being listed by
+  `ListModels`), `gemini-3.8-flash` — what the UI uses — returns 503 and then
+  read-timeouts, and `gemini-3.5-flash` answers reliably. Still overridable via
+  `GEMINI_MODEL`.
+
+  The failure was visible only because of the v01 decision to log Gemini errors
+  distinctly instead of letting them fall through as low-confidence `Others`.
+  The source spec's bare `except` would have reported ten confident-looking
+  `Others` classifications and moved ten files on no judgement at all.
+
+- **[Refactor / Maintenance] The agent's prompt now carries the full domain
+  descriptions and key signals** from `taxonomy.json`. It had been sending the
+  bare category names, a far weaker prompt than the taxonomy already contained.
+
 ## Version 26.10.20-012
 
 **Release Date:** 2026-10-21

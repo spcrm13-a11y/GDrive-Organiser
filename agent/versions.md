@@ -1,5 +1,29 @@
 # versions.md — gdrive-agent (MoneypenneyAgent)
 
+## 10 — 2026-10-21
+
+`[Bug Fix]` / `[Refactor / Maintenance]` First run against real Drive, and two
+fixes it forced.
+
+- **`gemini-2.5-flash` is retired** — 10/10 classifications failed with
+  `404 Not Found`. Default is now `gemini-3.5-flash`, measured working against
+  the live API; `gemini-3.8-flash` (what the UI uses) returned 503 then
+  read-timeouts. Override with `GEMINI_MODEL`.
+- **Taxonomy now read from the shared `taxonomy.json`** instead of a local
+  `CATEGORIES` list, so the agent and the UI cannot drift. It is looked up next
+  to `agent_daemon.py` first, then one level up; `scripts/deploy-to-vault.sh`
+  ships it to thevault.
+- **The prompt now includes each domain's description and key signals.** It had
+  been sending bare category names — far weaker than the taxonomy already held.
+
+Drive OAuth now works end to end: the agent lists real files and classifies
+them. Still dry-run only; nothing has been moved.
+
+The 404 was visible only because v01 logs Gemini errors distinctly rather than
+letting them fall through as low-confidence `Others`. The source spec's bare
+`except` would have reported ten confident-looking `Others` results and moved
+ten files on no judgement at all.
+
 ## 09 — 2026-10-20
 
 `[Refactor / Maintenance]` Moved into the `ainie-knowfind` repo as `agent/`,

@@ -34,19 +34,14 @@ const ai = new GoogleGenAI({
   },
 });
 
-export const OPERATIONAL_DOMAINS = [
-  'Personal',
-  'Financing/Investment',
-  'Smartplanet',
-  'Ainie',
-  'Adaptive Living',
-  'Masonic',
-  'AI Code Development',
-  'Strategy',
-  'Others',
-] as const;
-
-export type OperationalDomain = (typeof OPERATIONAL_DOMAINS)[number];
+// Single source of truth: taxonomy.json, via the generated literal union.
+// Do not re-list the domains here.
+export {
+  OPERATIONAL_DOMAINS,
+  type OperationalDomain,
+} from './src/types/taxonomy.generated';
+import { OPERATIONAL_DOMAINS as DOMAIN_NAMES } from './src/types/taxonomy.generated';
+import type { OperationalDomain } from './src/types/taxonomy.generated';
 
 export interface ClassificationResult {
   category: OperationalDomain;
@@ -617,7 +612,7 @@ app.get('/api/status', (req: Request, res: Response) => {
     model: 'gemini-3.8-flash',
     liveModel: 'gemini-3.8-live',
     hasApiKey: Boolean(apiKey),
-    supportedDomains: OPERATIONAL_DOMAINS,
+    supportedDomains: DOMAIN_NAMES,
     realityIsolationPriority: 'Active (Absolute Precedence)',
   });
 });

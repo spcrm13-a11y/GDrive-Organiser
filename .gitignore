@@ -18,3 +18,4 @@ agent/token.json
 agent/ledger/*.jsonl
 agent/reports/*.json
 agent/reports/*.md
+agent/taxonomy.json

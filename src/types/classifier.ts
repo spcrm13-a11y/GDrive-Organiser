@@ -1,13 +1,11 @@
-export type OperationalDomain =
-  | 'Personal'
-  | 'Financing/Investment'
-  | 'Smartplanet'
-  | 'Ainie'
-  | 'Adaptive Living'
-  | 'Masonic'
-  | 'AI Code Development'
-  | 'Strategy'
-  | 'Others';
+import taxonomy from '../../taxonomy.json';
+import {
+  OPERATIONAL_DOMAINS as OPERATIONAL_DOMAIN_NAMES,
+  type OperationalDomain,
+} from './taxonomy.generated';
+
+export { OPERATIONAL_DOMAIN_NAMES };
+export type { OperationalDomain };
 
 export interface DocumentClassificationResult {
   category: OperationalDomain;
@@ -53,19 +51,15 @@ export interface DomainMetadata {
   iconName: string;
 }
 
-export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
-  {
-    domain: 'Personal',
-    displayName: 'Personal',
-    description: 'CRITICAL PRIORITY (Reality Isolation): Tax documents (GPM311, freelancer filings, VAT, invoices), identity (passports, IDs), medical/health records, personal travel/shipping receipts, household utilities and private correspondence. Takes absolute precedence over all other categories.',
-    keySignals: [
-      'GPM311 / Tax Declarations',
-      'Freelancer Filings & VAT Invoices',
-      'Passports & National IDs',
-      'Medical / Clinical Notes',
-      'Travel & Flight Itineraries',
-      'Household Utilities & Rent'
-    ],
+/**
+ * Presentation only. The domain names, descriptions and key signals are the
+ * single source of truth in taxonomy.json -- never re-list them here.
+ */
+const DOMAIN_PRESENTATION: Record<
+  OperationalDomain,
+  { color: DomainMetadata['color']; iconName: string }
+> = {
+  'Personal': {
     color: {
       bg: 'bg-rose-500/10',
       text: 'text-rose-400',
@@ -74,20 +68,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'rose',
       glow: 'shadow-rose-500/20'
     },
-    iconName: 'ShieldAlert'
+    iconName: 'ShieldAlert',
   },
-  {
-    domain: 'Financing/Investment',
-    displayName: 'Financing / Investment',
-    description: 'Budgets, cap tables, term sheets, valuation models, funding proposals, financial projections, P&L statements, cost analyses, revenue shares, and royalties.',
-    keySignals: [
-      'Cap Tables & Valuation Models',
-      'Term Sheets & SAFE Notes',
-      'P&L Statements & Cost Analyses',
-      'Financial Projections & EBITDA',
-      'Funding Proposals & Seed Decks',
-      'Revenue Shares & Royalties'
-    ],
+  'Financing/Investment': {
     color: {
       bg: 'bg-emerald-500/10',
       text: 'text-emerald-400',
@@ -96,20 +79,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'emerald',
       glow: 'shadow-emerald-500/20'
     },
-    iconName: 'TrendingUp'
+    iconName: 'TrendingUp',
   },
-  {
-    domain: 'Smartplanet',
-    displayName: 'Smartplanet',
-    description: 'SmartPlanet AI architecture and social media initiative, governance systems, audit engines, enforcer mechanics, MQTT spine, and server architecture (WOPR, NORAD control, DEFCON status, The Farm, The Factory).',
-    keySignals: [
-      'SmartPlanet AI Architecture',
-      'MQTT Spine & Enforcer Mechanics',
-      'Audit Engines & Governance',
-      'WOPR & NORAD Control',
-      'DEFCON Status Dashboard',
-      'The Farm & The Factory Nodes'
-    ],
+  'Smartplanet': {
     color: {
       bg: 'bg-cyan-500/10',
       text: 'text-cyan-400',
@@ -118,20 +90,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'cyan',
       glow: 'shadow-cyan-500/20'
     },
-    iconName: 'Cpu'
+    iconName: 'Cpu',
   },
-  {
-    domain: 'Ainie',
-    displayName: 'Ainie',
-    description: 'Personal AI assistant and digital twin architecture, Genesis Protocol, AgentDash, AgentFrame, reality isolation layers, multi-space OS, HUD, localized domains (.life variants: Faulpelz, Tinginys, Flemmard, etc.).',
-    keySignals: [
-      'Genesis Protocol & AgentDash',
-      'AgentFrame & Digital Twin',
-      'Reality Isolation Layers',
-      'Multi-Space OS & HUD Specs',
-      '.life Variants (Faulpelz, Tinginys)',
-      'Ainie Assistant Persona'
-    ],
+  'Ainie': {
     color: {
       bg: 'bg-violet-500/10',
       text: 'text-violet-400',
@@ -140,20 +101,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'violet',
       glow: 'shadow-violet-500/20'
     },
-    iconName: 'Bot'
+    iconName: 'Bot',
   },
-  {
-    domain: 'Adaptive Living',
-    displayName: 'Adaptive Living',
-    description: 'Assisted living, ergonomic housing, accessibility systems, smart home automation for living spaces, and wellness infrastructure.',
-    keySignals: [
-      'Assisted Living & Ergonomics',
-      'Universal Accessibility Systems',
-      'Smart Home Living Automation',
-      'Wellness & Ambient Infrastructure',
-      'Mobility & Barrier-free Design',
-      'Sensory Environmental Controls'
-    ],
+  'Adaptive Living': {
     color: {
       bg: 'bg-amber-500/10',
       text: 'text-amber-400',
@@ -162,20 +112,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'amber',
       glow: 'shadow-amber-500/20'
     },
-    iconName: 'Home'
+    iconName: 'Home',
   },
-  {
-    domain: 'Masonic',
-    displayName: 'Masonic',
-    description: 'Lodge administration, member registries, fraternal records, Grand Lodge correspondence, lodge visitations, protocol and ritual documentation.',
-    keySignals: [
-      'Lodge Administration & Rosters',
-      'Grand Lodge Correspondence',
-      'Lodge Visitations & Protocols',
-      'Ritual Documentation & Trestleboard',
-      'Fraternal Records & Charters',
-      'Officer Degrees & Summons'
-    ],
+  'Masonic': {
     color: {
       bg: 'bg-blue-500/10',
       text: 'text-blue-400',
@@ -184,20 +123,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'blue',
       glow: 'shadow-blue-500/20'
     },
-    iconName: 'Compass'
+    iconName: 'Compass',
   },
-  {
-    domain: 'AI Code Development',
-    displayName: 'AI Code Development',
-    description: 'Repositories, Git, GitHub, Docker/container configurations, MCP tools, Python pipelines, n8n automations, agent frameworks, DORA/SPACE metrics.',
-    keySignals: [
-      'Git Repos & GitHub Actions',
-      'Docker & Container Configs',
-      'MCP (Model Context Protocol) Tools',
-      'Python Pipelines & ETL',
-      'n8n Workflows & Automations',
-      'DORA & SPACE Developer Metrics'
-    ],
+  'AI Code Development': {
     color: {
       bg: 'bg-teal-500/10',
       text: 'text-teal-400',
@@ -206,20 +134,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'teal',
       glow: 'shadow-teal-500/20'
     },
-    iconName: 'Terminal'
+    iconName: 'Terminal',
   },
-  {
-    domain: 'Strategy',
-    displayName: 'Strategy',
-    description: 'Enterprise roadmaps, operating models, Balanced Scorecards (BSC), architectural governance frameworks, organizational design, and high-level vision documents.',
-    keySignals: [
-      'Enterprise Roadmaps & Milestones',
-      'Balanced Scorecards (BSC)',
-      'Operating Models & Target State',
-      'Architectural Governance',
-      'Organizational Design & RACI',
-      'Executive Vision & OKRs'
-    ],
+  'Strategy': {
     color: {
       bg: 'bg-indigo-500/10',
       text: 'text-indigo-400',
@@ -228,18 +145,9 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'indigo',
       glow: 'shadow-indigo-500/20'
     },
-    iconName: 'Target'
+    iconName: 'Target',
   },
-  {
-    domain: 'Others',
-    displayName: 'Others',
-    description: 'Any document that does not clearly belong to the 8 primary domains above.',
-    keySignals: [
-      'Uncategorized General Content',
-      'Cross-Domain Neutral Notes',
-      'External News & General Reading',
-      'Ambiguous Raw Snippets'
-    ],
+  'Others': {
     color: {
       bg: 'bg-slate-500/10',
       text: 'text-slate-400',
@@ -248,9 +156,27 @@ export const OPERATIONAL_DOMAINS: DomainMetadata[] = [
       accent: 'slate',
       glow: 'shadow-slate-500/20'
     },
-    iconName: 'HelpCircle'
+    iconName: 'HelpCircle',
+  },
+};
+
+export const OPERATIONAL_DOMAINS: DomainMetadata[] = taxonomy.domains.map((d) => {
+  const domain = d.domain as OperationalDomain;
+  const presentation = DOMAIN_PRESENTATION[domain];
+  if (!presentation) {
+    throw new Error(
+      `taxonomy.json declares domain "${d.domain}" with no presentation entry ` +
+        `in classifier.ts. Add its colour and icon.`,
+    );
   }
-];
+  return {
+    domain,
+    displayName: d.displayName,
+    description: d.description,
+    keySignals: d.keySignals,
+    ...presentation,
+  };
+});
 
 export const CLASSIFICATION_JSON_SCHEMA = {
   $schema: 'http://json-schema.org/draft-07/schema#',
@@ -260,17 +186,7 @@ export const CLASSIFICATION_JSON_SCHEMA = {
   properties: {
     category: {
       type: 'string',
-      enum: [
-        'Personal',
-        'Financing/Investment',
-        'Smartplanet',
-        'Ainie',
-        'Adaptive Living',
-        'Masonic',
-        'AI Code Development',
-        'Strategy',
-        'Others'
-      ],
+      enum: [...OPERATIONAL_DOMAIN_NAMES],
       description: 'EXACTLY ONE of the 9 defined operational domains'
     },
     reason: {

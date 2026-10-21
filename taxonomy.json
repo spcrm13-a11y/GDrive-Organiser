@@ -1,0 +1,121 @@
+{
+  "$comment": "SINGLE SOURCE OF TRUTH for the operational taxonomy. Consumed by src/types/classifier.ts, server.ts and agent/agent_daemon.py. Do not re-declare these names anywhere else.",
+  "version": 1,
+  "domains": [
+    {
+      "domain": "Personal",
+      "displayName": "Personal",
+      "description": "CRITICAL PRIORITY (Reality Isolation): Tax documents (GPM311, freelancer filings, VAT, invoices), identity (passports, IDs), medical/health records, personal travel/shipping receipts, household utilities and private correspondence. Takes absolute precedence over all other categories.",
+      "keySignals": [
+        "GPM311 / Tax Declarations",
+        "Freelancer Filings & VAT Invoices",
+        "Passports & National IDs",
+        "Medical / Clinical Notes",
+        "Travel & Flight Itineraries",
+        "Household Utilities & Rent"
+      ]
+    },
+    {
+      "domain": "Financing/Investment",
+      "displayName": "Financing / Investment",
+      "description": "Budgets, cap tables, term sheets, valuation models, funding proposals, financial projections, P&L statements, cost analyses, revenue shares, and royalties.",
+      "keySignals": [
+        "Cap Tables & Valuation Models",
+        "Term Sheets & SAFE Notes",
+        "P&L Statements & Cost Analyses",
+        "Financial Projections & EBITDA",
+        "Funding Proposals & Seed Decks",
+        "Revenue Shares & Royalties"
+      ]
+    },
+    {
+      "domain": "Smartplanet",
+      "displayName": "Smartplanet",
+      "description": "SmartPlanet AI architecture and social media initiative, governance systems, audit engines, enforcer mechanics, MQTT spine, and server architecture (WOPR, NORAD control, DEFCON status, The Farm, The Factory).",
+      "keySignals": [
+        "SmartPlanet AI Architecture",
+        "MQTT Spine & Enforcer Mechanics",
+        "Audit Engines & Governance",
+        "WOPR & NORAD Control",
+        "DEFCON Status Dashboard",
+        "The Farm & The Factory Nodes"
+      ]
+    },
+    {
+      "domain": "Ainie",
+      "displayName": "Ainie",
+      "description": "Personal AI assistant and digital twin architecture, Genesis Protocol, AgentDash, AgentFrame, reality isolation layers, multi-space OS, HUD, localized domains (.life variants: Faulpelz, Tinginys, Flemmard, etc.).",
+      "keySignals": [
+        "Genesis Protocol & AgentDash",
+        "AgentFrame & Digital Twin",
+        "Reality Isolation Layers",
+        "Multi-Space OS & HUD Specs",
+        ".life Variants (Faulpelz, Tinginys)",
+        "Ainie Assistant Persona"
+      ]
+    },
+    {
+      "domain": "Adaptive Living",
+      "displayName": "Adaptive Living",
+      "description": "Assisted living, ergonomic housing, accessibility systems, smart home automation for living spaces, and wellness infrastructure.",
+      "keySignals": [
+        "Assisted Living & Ergonomics",
+        "Universal Accessibility Systems",
+        "Smart Home Living Automation",
+        "Wellness & Ambient Infrastructure",
+        "Mobility & Barrier-free Design",
+        "Sensory Environmental Controls"
+      ]
+    },
+    {
+      "domain": "Masonic",
+      "displayName": "Masonic",
+      "description": "Lodge administration, member registries, fraternal records, Grand Lodge correspondence, lodge visitations, protocol and ritual documentation.",
+      "keySignals": [
+        "Lodge Administration & Rosters",
+        "Grand Lodge Correspondence",
+        "Lodge Visitations & Protocols",
+        "Ritual Documentation & Trestleboard",
+        "Fraternal Records & Charters",
+        "Officer Degrees & Summons"
+      ]
+    },
+    {
+      "domain": "AI Code Development",
+      "displayName": "AI Code Development",
+      "description": "Repositories, Git, GitHub, Docker/container configurations, MCP tools, Python pipelines, n8n automations, agent frameworks, DORA/SPACE metrics.",
+      "keySignals": [
+        "Git Repos & GitHub Actions",
+        "Docker & Container Configs",
+        "MCP (Model Context Protocol) Tools",
+        "Python Pipelines & ETL",
+        "n8n Workflows & Automations",
+        "DORA & SPACE Developer Metrics"
+      ]
+    },
+    {
+      "domain": "Strategy",
+      "displayName": "Strategy",
+      "description": "Enterprise roadmaps, operating models, Balanced Scorecards (BSC), architectural governance frameworks, organizational design, and high-level vision documents.",
+      "keySignals": [
+        "Enterprise Roadmaps & Milestones",
+        "Balanced Scorecards (BSC)",
+        "Operating Models & Target State",
+        "Architectural Governance",
+        "Organizational Design & RACI",
+        "Executive Vision & OKRs"
+      ]
+    },
+    {
+      "domain": "Others",
+      "displayName": "Others",
+      "description": "Any document that does not clearly belong to the 8 primary domains above.",
+      "keySignals": [
+        "Uncategorized General Content",
+        "Cross-Domain Neutral Notes",
+        "External News & General Reading",
+        "Ambiguous Raw Snippets"
+      ]
+    }
+  ]
+}
