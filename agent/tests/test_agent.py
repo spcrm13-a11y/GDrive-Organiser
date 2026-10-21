@@ -457,3 +457,95 @@ class SnippetTests(unittest.TestCase):
                                      "application/vnd.google-apps.document"}, 0)
         self.assertEqual(out, "d1")
         files.export.assert_not_called()
+
+
+class TitleOnlyTests(unittest.TestCase):
+    """A verdict reached without readable text is a guess and must say so."""
+
+    def _batch(self, snippet):
+        page = {"files": [{"id": "1", "name": "x", "parents": ["p"],
+                           "mimeType": "application/vnd.google-apps.site"}]}
+        f = FakeFiles([page] + [{"files": []}] * len(ad.CATEGORIES))
+        args = mock.Mock(days=425, limit=1, server_filter=False, apply=False,
+                         snippet_chars=4000)
+        with mock.patch.object(ad, "fetch_snippet", return_value=snippet), \
+             mock.patch.object(ad, "classify",
+                               return_value=({"category": "Personal",
+                                              "confidence": 0.95,
+                                              "reason": "r"}, False)):
+            return ad.classify_batch(FakeService(f), "k", args)
+
+    def test_empty_snippet_is_flagged_title_only(self):
+        self.assertTrue(self._batch("")[0]["title_only"])
+
+    def test_real_text_is_not_flagged(self):
+        self.assertFalse(self._batch("x" * 500)[0]["title_only"])
+
+    def test_apps_script_is_exportable(self):
+        self.assertIn("application/vnd.google-apps.script", ad.EXPORTABLE)
+
+    def test_sites_are_not_exportable(self):
+        self.assertNotIn("application/vnd.google-apps.site", ad.EXPORTABLE)
+
+    def test_report_marks_weak_verdicts(self):
+        import tempfile
+        tmp = tempfile.mkdtemp()
+        with mock.patch.object(ad, "BASE", tmp):
+            ad.write_report([{
+                "file_id": "1", "name": "guessed", "target_category": "Personal",
+                "confidence": 0.95, "reason": "r", "api_failed": False,
+                "title_only": True, "original_parents": [], "target_folder_id": "f",
+            }], mock.Mock())
+            md = [x for x in os.listdir(os.path.join(tmp, "reports"))
+                  if x.endswith(".md")][0]
+            body = open(os.path.join(tmp, "reports", md)).read()
+        self.assertIn("title only", body)
+
+
+class CoercionTests(unittest.TestCase):
+    """Model output is untrusted. A single bad field once killed a whole run."""
+
+    def test_the_string_that_crashed_a_live_run(self):
+        self.assertEqual(ad.coerce_confidence("High"), 0.9)
+
+    def test_word_scale_is_case_insensitive(self):
+        for word, want in [("HIGH", 0.9), ("medium", 0.6), ("Low", 0.3),
+                           ("very high", 0.95), ("unknown", 0.0)]:
+            self.assertEqual(ad.coerce_confidence(word), want, word)
+
+    def test_unit_interval_passes_through(self):
+        self.assertAlmostEqual(ad.coerce_confidence(0.85), 0.85)
+
+    def test_percent_scale_is_normalised(self):
+        self.assertAlmostEqual(ad.coerce_confidence(95), 0.95)
+        self.assertAlmostEqual(ad.coerce_confidence("95%"), 0.95)
+        self.assertAlmostEqual(ad.coerce_confidence("0.85"), 0.85)
+
+    def test_garbage_and_none_become_zero(self):
+        for bad in [None, "", "banana", {}, [], True, False]:
+            self.assertEqual(ad.coerce_confidence(bad), 0.0, repr(bad))
+
+    def test_clamped_to_unit_interval(self):
+        self.assertEqual(ad.coerce_confidence(500), 1.0)
+        self.assertEqual(ad.coerce_confidence(-3), 0.0)
+
+    def test_category_matching_is_case_insensitive(self):
+        self.assertEqual(ad.coerce_category("personal"), "Personal")
+        self.assertEqual(ad.coerce_category("  AI Code Development "),
+                         "AI Code Development")
+
+    def test_unknown_or_non_string_category_is_others(self):
+        for bad in ["Nonsense", None, 42, {}]:
+            self.assertEqual(ad.coerce_category(bad), "Others", repr(bad))
+
+    def test_batch_survives_a_string_confidence(self):
+        page = {"files": [{"id": "1", "name": "x", "parents": ["p"]}]}
+        f = FakeFiles([page] + [{"files": []}] * len(ad.CATEGORIES))
+        args = mock.Mock(days=425, limit=1, server_filter=False, apply=False,
+                         snippet_chars=0)
+        with mock.patch.object(ad, "classify",
+                               return_value=({"category": "Personal",
+                                              "confidence": "High",
+                                              "reason": "r"}, False)):
+            rows = ad.classify_batch(FakeService(f), "k", args)
+        self.assertEqual(rows[0]["confidence"], 0.9)

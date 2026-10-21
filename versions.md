@@ -16,6 +16,36 @@
 
 ---
 
+## Version 26.10.22-017
+
+**Release Date:** 2026-10-22
+**Status:** Done
+
+- **[Bug Fix] Model output is untrusted input.** A dry run crashed on file 2
+  of 12 with `ValueError: could not convert string to float: 'High'` — the
+  model returned a word where a number was expected and one unguarded
+  `float()` aborted the whole batch. Confidence and category are now coerced
+  defensively (unit interval, 0-100, percent strings, word scale,
+  case-insensitive category matching, `Others`/`0.0` fallbacks). Lengthening
+  the prompt is what changed the output shape, so this will keep happening
+  whenever the prompt moves. Nine tests, the first being the exact crashing
+  string.
+
+- **[Bug Fix] The `Personal` rule matched on topic rather than on what a
+  document is.** `steuerT-spec1` — a commercial product spec whose text opens
+  *"Product and features system covers the full German small-business
+  compliance cycle"* — was filed `Personal` at 95% because it mentions tax.
+  The instruction now says `Personal` means **your own** records and that a
+  spec, dashboard or piece of software *about* tax or health is not Personal.
+
+- **[User Request] Weak verdicts are labelled.** Apps Scripts are now
+  exportable (`...script+json`), but Google Sites and Forms cannot be exported
+  at all and were being classified from the filename while reporting 95%
+  confidence. Any verdict reached on under 50 characters of text is marked
+  `title_only` — `?` in the console, `[title only - weak]` in the report, plus
+  a summary count — so a confident-looking guess is visibly separated from a
+  verdict that actually read the document.
+
 ## Version 26.10.22-016
 
 **Release Date:** 2026-10-22

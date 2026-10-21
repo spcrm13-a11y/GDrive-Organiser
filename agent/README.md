@@ -4,7 +4,7 @@ Classifies Google Drive files into nine categories with Gemini and files them
 into root-level folders. **Dry-run by default — it changes nothing unless you
 pass `--apply`.**
 
-Version: see [`versions.md`](versions.md). Current: **13**.
+Version: see [`versions.md`](versions.md). Current: **15**.
 
 ## Where it runs
 

@@ -1,5 +1,69 @@
 # versions.md — gdrive-agent (MoneypenneyAgent)
 
+## 15 — 2026-10-22
+
+`[Bug Fix]` A single untrusted field killed an entire run.
+
+The v14 dry run crashed on file 2 of 12:
+
+```
+ValueError: could not convert string to float: 'High'
+```
+
+The model returned `"confidence": "High"` instead of a number, and
+`float(verdict.get("confidence", 0))` was called unguarded — so one unusual
+field aborted the whole batch. Lengthening the prompt in v14 is what changed
+the output shape, which is the general lesson: **model output is input, and
+every field of it is untrusted.**
+
+`coerce_confidence()` now accepts the unit interval, a 0-100 scale, percent
+strings, and the word scale (`very high`/`high`/`medium`/`low`/...), clamps to
+0-1, and returns `0.0` for anything it cannot read — including `None`, `{}`
+and booleans, since `isinstance(True, int)` is `True` in Python and would
+otherwise coerce to 1.0. `coerce_category()` matches domains
+case-insensitively and falls back to `Others`.
+
+Both are applied in `classify_batch` and in the report writer, which had the
+same unguarded `float()`.
+
+Nine tests added, the first of which is the exact string that crashed the live
+run. 48 total.
+
+## 14 — 2026-10-22
+
+`[Bug Fix]` Two residual misclassifications, two distinct causes.
+
+Content extraction fixed the worst case (`define the api`: Personal 100% ->
+AI Code Development 95%). Inspecting what remained:
+
+- **`GDRive Xfer` is an Apps Script, `SteuerTom Dashboard` is a Google Site.**
+  Neither was exportable, so both were classified from the title alone and
+  both landed in `Personal` at 95%. Apps Script *can* export, as
+  `application/vnd.google-apps.script+json` — added. Sites and Forms cannot,
+  and nothing will change that.
+- **`steuerT-spec1` had its full text and still went to `Personal`.** The
+  content is *"Product and features system covers the full German
+  small-business compliance cycle... the product's main differentiator"* — a
+  commercial product spec. The word "tax" was pulling it into Personal. The
+  `CRITICAL` instruction was too blunt: it listed topics, so the model matched
+  on topic.
+
+  It now says `Personal` means **your own** records — your filed returns, your
+  passport, your medical history — and states explicitly that a spec,
+  dashboard, business plan or piece of software *about* tax or health is not
+  Personal, and should be classified by what the document **is** rather than
+  what it discusses.
+
+`[User Request]` **Weak verdicts are now labelled.** A classification reached
+with under 50 characters of text is marked `title_only`: `?` instead of `-` in
+the console, `[title only - weak]` in the markdown report, and a summary line
+counting them. A high confidence number on a filename-only guess is exactly
+how the earlier mistakes looked authoritative, so the report now distinguishes
+"read the document" from "guessed from the name" regardless of what the model
+claims.
+
+Five tests added. 39 total.
+
 ## 13 — 2026-10-22
 
 `[Bug Fix]` Classify on the document's **text**, not just its filename.

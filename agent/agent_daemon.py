@@ -22,7 +22,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-VERSION = "13"
+VERSION = "15"
 AGENT_TAG = "MoneypenneyAgent"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Sibling project ainie-knowfind (same taxonomy, mock corpus) runs
@@ -41,6 +41,7 @@ EXPORTABLE = {
     "application/vnd.google-apps.document": "text/plain",
     "application/vnd.google-apps.presentation": "text/plain",
     "application/vnd.google-apps.spreadsheet": "text/csv",
+    "application/vnd.google-apps.script": "application/vnd.google-apps.script+json",
 }
 RETRYABLE = {429, 500, 502, 503, 504}
 
@@ -196,7 +197,15 @@ into EXACTLY ONE of these domains:
 
 {domains}
 
-CRITICAL: Taxes, invoices, medical records, passports, personal shipping/flights go to 'Personal'.
+CRITICAL - 'Personal' means YOUR OWN private records: your filed tax returns,
+your invoices, your medical records, your passport, your travel bookings,
+your utility bills.
+
+It does NOT mean any document that merely mentions those subjects. A product
+specification, dashboard, business plan, API design or piece of software
+*about* tax, finance or health is NOT 'Personal' - classify it by what the
+document IS (a spec, a system design, a strategy paper), not by the topic it
+discusses.
 
 Document Title: {name}
 Snippet: {snippet}
@@ -230,6 +239,48 @@ def call_ollama(name, snippet=""):
         log(f"    [!] OLLAMA FAILURE for {name!r}: {type(e).__name__}: {e}")
         return {"category": "Others", "reason": f"BACKEND_FAILURE: {e}",
                 "confidence": 0.0}, True
+
+
+WORD_CONFIDENCE = {"very high": 0.95, "high": 0.9, "medium": 0.6, "moderate": 0.6,
+                   "low": 0.3, "very low": 0.1, "none": 0.0, "unknown": 0.0}
+
+
+def coerce_confidence(raw):
+    """Model output is untrusted. Never let it reach float() unguarded.
+
+    A single `"confidence": "High"` once killed a whole batch mid-run. Models
+    also return 0-100 instead of 0-1, or percent strings.
+    """
+    if isinstance(raw, bool):
+        return 0.0
+    if isinstance(raw, (int, float)):
+        v = float(raw)
+    elif isinstance(raw, str):
+        t = raw.strip().rstrip("%").strip()
+        if t.lower() in WORD_CONFIDENCE:
+            return WORD_CONFIDENCE[t.lower()]
+        try:
+            v = float(t)
+        except ValueError:
+            return 0.0
+        if "%" in raw:
+            v /= 100.0
+    else:
+        return 0.0
+    if v > 1.0:                      # 0-100 scale
+        v /= 100.0
+    return max(0.0, min(1.0, v))
+
+
+def coerce_category(raw):
+    """Map whatever came back onto a real domain, case-insensitively."""
+    if not isinstance(raw, str):
+        return "Others"
+    t = raw.strip()
+    for c in CATEGORIES:
+        if c.lower() == t.lower():
+            return c
+    return "Others"
 
 
 def classify(api_key, name, snippet=""):
@@ -426,6 +477,7 @@ def classify_batch(service, api_key, args):
         try:
             snippet = fetch_snippet(service, f, args.snippet_chars)
             verdict, failed = classify(api_key, f["name"], snippet)
+            thin = len(snippet) < 50
         except QuotaExhausted as q:
             hours = q.retry_after_s / 3600.0
             log("")
@@ -440,9 +492,8 @@ def classify_batch(service, api_key, args):
                 "run smaller batches with --limit.")
             break
         api_failures += failed
-        cat = verdict.get("category", "Others")
-        if cat not in CATEGORIES:
-            cat = "Others"
+        cat = coerce_category(verdict.get("category"))
+        conf = coerce_confidence(verdict.get("confidence"))
         rows.append({
             "file_id": f["id"],
             "name": f["name"],
@@ -451,17 +502,26 @@ def classify_batch(service, api_key, args):
             "original_parents": f.get("parents", []),
             "target_category": cat,
             "target_folder_id": folders.get(cat),
-            "confidence": verdict.get("confidence", 0.0),
+            "confidence": conf,
             "reason": str(verdict.get("reason", ""))[:200],
             "api_failed": failed,
+            # No readable text: the verdict is a guess from the filename.
+            # Drive cannot export Sites, Forms or binary types.
+            "title_only": thin,
         })
-        mark = "!" if failed else "-"
-        log(f"  {mark}> [{cat}] ({float(verdict.get('confidence', 0)) * 100:.0f}%) "
-            f"{f['name']!r}")
+        mark = "!" if failed else ("?" if thin else "-")
+        log(f"  {mark}> [{cat}] ({conf * 100:.0f}%) "
+            f"{f['name']!r}" + ("   [title only]" if thin else ""))
 
     if api_failures:
         log(f"[!] {api_failures}/{len(files)} classification(s) came from an "
             f"API FAILURE, not real judgement. Treat those as unclassified.")
+    thin_n = sum(1 for r in rows if r.get("title_only"))
+    if thin_n:
+        log(f"[?] {thin_n}/{len(rows)} classified from the FILENAME ALONE - no "
+            f"readable text (Sites, Forms, and most binary types cannot be")
+        log(f"    exported by Drive). Treat those verdicts as weak regardless "
+            f"of the confidence number.")
     return rows
 
 
@@ -486,8 +546,10 @@ def write_report(rows, args):
                 continue
             fh.write(f"## {cat} ({len(items)})\n\n")
             for r in items:
-                flag = " **[API FAILURE]**" if r["api_failed"] else ""
-                fh.write(f"- `{r['name']}` - {float(r['confidence']) * 100:.0f}%"
+                flag = (" **[API FAILURE]**" if r["api_failed"]
+                        else " **[title only - weak]**" if r.get("title_only")
+                        else "")
+                fh.write(f"- `{r['name']}` - {coerce_confidence(r['confidence']) * 100:.0f}%"
                          f"{flag}\n  - {r['reason']}\n")
             fh.write("\n")
     log(f"[v] Report: {mpath}")
