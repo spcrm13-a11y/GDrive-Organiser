@@ -4,7 +4,7 @@ Classifies Google Drive files into nine categories with Gemini and files them
 into root-level folders. **Dry-run by default — it changes nothing unless you
 pass `--apply`.**
 
-Version: see [`versions.md`](versions.md). Current: **12**.
+Version: see [`versions.md`](versions.md). Current: **13**.
 
 ## Where it runs
 
@@ -79,7 +79,13 @@ source scripts/infisical-env.sh
 | `--limit N` | 25 | files per batch |
 | `--days N` | 425 | `modifiedTime` lookback window |
 | `--revert L` | — | undo a prior apply from its ledger |
+| `--snippet-chars N` | 4000 | document text to classify on; 0 = filename only |
 | `--server-filter` | off | use the undocumented `not appProperties has` query |
+
+Google Docs, Sheets and Slides are exported as text so the classifier sees
+real content. Only ~3% of Drive files carry a description, so without this it
+would be guessing from filenames. PDFs cannot be exported by Drive and fall
+back to the title.
 
 ## Tests
 

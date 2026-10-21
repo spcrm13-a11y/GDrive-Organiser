@@ -1,5 +1,41 @@
 # versions.md — gdrive-agent (MoneypenneyAgent)
 
+## 13 — 2026-10-22
+
+`[Bug Fix]` Classify on the document's **text**, not just its filename.
+
+The first local dry run classified 12/12 without error but got at least two
+badly wrong, both over-applying the "Personal takes absolute precedence" rule:
+
+```
+define the api   -> Personal 100%     (it is an API specification)
+GDRive Xfer      -> Personal  95%
+```
+
+100% confidence on a wrong answer is the worst case: not hedging, confidently
+misfiling. The cause was not the model. Measured on a 200-file sample of the
+real Drive, **only 6 files had any description at all** — so `snippet` was
+empty and the classifier was guessing from a handful of title words. `define
+the api` actually opens: *"An enterprise RESTful and MCP API specification for
+SteuerTom, derived directly..."*
+
+`fetch_snippet()` now exports Google-native files as text
+(`document`/`presentation` -> `text/plain`, `spreadsheet` -> `text/csv`),
+collapses whitespace and truncates to `--snippet-chars` (default 4000). Types
+Drive cannot export, such as PDF, fall back to the description as before. An
+export failure logs and degrades to the title rather than aborting the run.
+104 of those 200 sampled files are Google Docs, so this covers about half the
+corpus immediately.
+
+Model size was tested and is **not** the fix: `qwen2.5:14b-instruct` was three
+times slower (18s vs 6.4s per file) and returned invalid JSON on 4 of 5 files.
+`qwen2.5:7b-instruct` stays the default.
+
+Six tests added for the export path, including fallback-on-failure,
+truncation, and `--snippet-chars 0` disabling it. Five existing batch tests
+passed a `mock.Mock` args object with no `snippet_chars`, which raised
+`TypeError` on the comparison — fixed.
+
 ## 12 — 2026-10-22
 
 `[User Request]` Pluggable classifier backend, defaulting to a **local model**.

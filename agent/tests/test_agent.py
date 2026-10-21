@@ -127,7 +127,8 @@ class ClassificationTests(unittest.TestCase):
     def test_unknown_category_falls_back_to_others(self):
         f = FakeFiles([{"files": [{"id": "1", "name": "x.pdf", "parents": ["p"]}]}]
                       + [{"files": []}] * len(ad.CATEGORIES))
-        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False)
+        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False,
+                         snippet_chars=0)
         with mock.patch.object(ad, "classify",
                                return_value=({"category": "Nonsense",
                                               "confidence": 0.9}, False)):
@@ -137,7 +138,8 @@ class ClassificationTests(unittest.TestCase):
     def test_api_failure_is_flagged_not_disguised(self):
         f = FakeFiles([{"files": [{"id": "1", "name": "x.pdf", "parents": ["p"]}]}]
                       + [{"files": []}] * len(ad.CATEGORIES))
-        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False)
+        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False,
+                         snippet_chars=0)
         with mock.patch.object(ad, "classify",
                                return_value=({"category": "Others",
                                               "confidence": 0.0,
@@ -219,7 +221,8 @@ class DryRunIsInertTests(unittest.TestCase):
         files = {"files": [{"id": "1", "name": "invoice.pdf", "parents": ["p"]},
                            {"id": "2", "name": "deck.pptx", "parents": ["p"]}]}
         f = FakeFiles([files] + [{"files": []}] * len(ad.CATEGORIES))
-        args = mock.Mock(days=425, limit=25, server_filter=False, apply=False)
+        args = mock.Mock(days=425, limit=25, server_filter=False, apply=False,
+                         snippet_chars=0)
 
         with mock.patch.object(ad, "classify",
                                return_value=({"category": "Personal",
@@ -356,7 +359,8 @@ class QuotaTests(unittest.TestCase):
         page = {"files": [{"id": str(i), "name": f"f{i}.pdf", "parents": ["p"]}
                           for i in range(5)]}
         f = FakeFiles([page] + [{"files": []}] * len(ad.CATEGORIES))
-        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False)
+        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False,
+                         snippet_chars=0)
 
         seq = [({"category": "Personal", "confidence": 0.9, "reason": "x"}, False),
                ({"category": "Strategy", "confidence": 0.8, "reason": "y"}, False)]
@@ -384,7 +388,8 @@ class NoNetworkInTestsTests(unittest.TestCase):
     def test_batch_never_calls_a_backend_directly(self):
         page = {"files": [{"id": "1", "name": "x.pdf", "parents": ["p"]}]}
         f = FakeFiles([page] + [{"files": []}] * len(ad.CATEGORIES))
-        args = mock.Mock(days=425, limit=1, server_filter=False, apply=False)
+        args = mock.Mock(days=425, limit=1, server_filter=False, apply=False,
+                         snippet_chars=0)
         with mock.patch.object(ad, "classify",
                                return_value=({"category": "Others",
                                               "confidence": 0.1}, False)), \
@@ -393,3 +398,62 @@ class NoNetworkInTestsTests(unittest.TestCase):
             ad.classify_batch(FakeService(f), "key", args)
         o.assert_not_called()
         g.assert_not_called()
+
+
+class SnippetTests(unittest.TestCase):
+    """97% of Drive files carry no description, so exported text is the only
+    real signal the classifier gets."""
+
+    def _svc(self, export_result=None, boom=None):
+        f = FakeFiles()
+        exp = mock.Mock()
+        if boom:
+            exp.execute.side_effect = boom
+        else:
+            exp.execute.return_value = export_result
+        f.export = mock.Mock(return_value=exp)
+        return FakeService(f), f
+
+    def test_google_doc_is_exported_as_text(self):
+        svc, files = self._svc(b"  Hello\n\n  world  ")
+        out = ad.fetch_snippet(svc, {
+            "id": "1", "name": "d", "description": "ignored",
+            "mimeType": "application/vnd.google-apps.document"}, 4000)
+        self.assertEqual(out, "Hello world", "whitespace must be collapsed")
+        files.export.assert_called_once()
+        self.assertEqual(files.export.call_args.kwargs["mimeType"], "text/plain")
+
+    def test_spreadsheet_exports_as_csv(self):
+        svc, files = self._svc(b"a,b\n1,2")
+        ad.fetch_snippet(svc, {"id": "1", "name": "s", "mimeType":
+                               "application/vnd.google-apps.spreadsheet"}, 4000)
+        self.assertEqual(files.export.call_args.kwargs["mimeType"], "text/csv")
+
+    def test_pdf_falls_back_to_description_without_exporting(self):
+        svc, files = self._svc(b"never used")
+        out = ad.fetch_snippet(svc, {"id": "1", "name": "p", "mimeType":
+                                     "application/pdf",
+                                     "description": "a desc"}, 4000)
+        self.assertEqual(out, "a desc")
+        files.export.assert_not_called()
+
+    def test_export_failure_degrades_to_description(self):
+        svc, _ = self._svc(boom=RuntimeError("too large"))
+        out = ad.fetch_snippet(svc, {"id": "1", "name": "d", "description": "fb",
+                                     "mimeType":
+                                     "application/vnd.google-apps.document"}, 4000)
+        self.assertEqual(out, "fb", "a failed export must not abort the run")
+
+    def test_truncated_to_the_requested_length(self):
+        svc, _ = self._svc(b"x" * 10000)
+        out = ad.fetch_snippet(svc, {"id": "1", "name": "d", "mimeType":
+                                     "application/vnd.google-apps.document"}, 500)
+        self.assertEqual(len(out), 500)
+
+    def test_zero_disables_export_entirely(self):
+        svc, files = self._svc(b"nope")
+        out = ad.fetch_snippet(svc, {"id": "1", "name": "d", "description": "d1",
+                                     "mimeType":
+                                     "application/vnd.google-apps.document"}, 0)
+        self.assertEqual(out, "d1")
+        files.export.assert_not_called()

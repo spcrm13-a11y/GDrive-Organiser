@@ -22,7 +22,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-VERSION = "12"
+VERSION = "13"
 AGENT_TAG = "MoneypenneyAgent"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Sibling project ainie-knowfind (same taxonomy, mock corpus) runs
@@ -34,6 +34,14 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://100.113.72.52:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "180"))
+
+# Google-native types Drive can export as text. 97% of files carry no
+# description, so without this the classifier works from the filename alone.
+EXPORTABLE = {
+    "application/vnd.google-apps.document": "text/plain",
+    "application/vnd.google-apps.presentation": "text/plain",
+    "application/vnd.google-apps.spreadsheet": "text/csv",
+}
 RETRYABLE = {429, 500, 502, 503, 504}
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -328,6 +336,32 @@ def resolve_category_folders(service, create):
     return folders, missing, dupes
 
 
+def fetch_snippet(service, f, max_chars):
+    """Real text for the classifier, falling back to the description.
+
+    Measured on a 200-file sample: only 6 files had any description, while
+    104 were Google Docs. Exporting those gives thousands of characters of
+    actual content instead of a filename guess.
+    """
+    if max_chars <= 0:
+        return f.get("description", "")
+    export_as = EXPORTABLE.get(f.get("mimeType", ""))
+    if not export_as:
+        return f.get("description", "")
+    try:
+        data = with_backoff(
+            lambda: service.files().export(fileId=f["id"],
+                                           mimeType=export_as).execute(),
+            f"export {f['name']}")
+    except Exception as e:
+        # Too large, or not exportable after all. The filename still works.
+        log(f"    [i] no text for {f['name']!r} ({type(e).__name__}); "
+            f"using title only")
+        return f.get("description", "")
+    text = data.decode("utf-8", "replace") if isinstance(data, bytes) else str(data)
+    return " ".join(text.split())[:max_chars]
+
+
 def list_candidates(service, days, limit, server_filter=False):
     """Files not yet processed by this agent.
 
@@ -390,8 +424,8 @@ def classify_batch(service, api_key, args):
     rows, api_failures = [], 0
     for f in files:
         try:
-            verdict, failed = classify(api_key, f["name"],
-                                       f.get("description", ""))
+            snippet = fetch_snippet(service, f, args.snippet_chars)
+            verdict, failed = classify(api_key, f["name"], snippet)
         except QuotaExhausted as q:
             hours = q.retry_after_s / 3600.0
             log("")
@@ -540,6 +574,9 @@ def main():
                    help="max files per batch (default 25)")
     p.add_argument("--days", type=int, default=425,
                    help="modifiedTime lookback window (default 425)")
+    p.add_argument("--snippet-chars", type=int, default=4000,
+                   help="characters of document text to classify on "
+                        "(default 4000; 0 = filename and description only)")
     p.add_argument("--server-filter", action="store_true",
                    help="use the undocumented 'not appProperties has' query "
                         "form instead of filtering client-side")

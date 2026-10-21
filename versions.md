@@ -16,6 +16,28 @@
 
 ---
 
+## Version 26.10.22-016
+
+**Release Date:** 2026-10-22
+**Status:** Done
+
+- **[Bug Fix] The agent classifies on document text now, not just filenames.**
+  Detail in `agent/versions.md` entry 13.
+
+  The first local dry run finished 12/12 cleanly but got at least two badly
+  wrong — `define the api` filed as **Personal at 100% confidence** when it is
+  an API specification. Confident misfiling is worse than failure, and it is
+  precisely what the dry-run gate exists to catch.
+
+  The cause was missing input, not a weak model. Measured on a 200-file sample
+  of the real Drive: **6 files had a description; 104 were Google Docs.** The
+  classifier was working from a few title words. Those Docs export as plain
+  text in one API call, which turns `define the api` into *"An enterprise
+  RESTful and MCP API specification for SteuerTom..."*.
+
+  Model size was tested and rejected as the fix: `qwen2.5:14b-instruct` ran 3x
+  slower and emitted invalid JSON on 4 of 5 files.
+
 ## Version 26.10.22-015
 
 **Release Date:** 2026-10-22
