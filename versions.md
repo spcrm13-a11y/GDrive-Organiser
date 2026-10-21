@@ -16,6 +16,28 @@
 
 ---
 
+## Version 26.10.20-014
+
+**Release Date:** 2026-10-21
+**Status:** Done
+
+- **[Bug Fix] The agent now stops when the daily Gemini quota is exhausted**
+  rather than retrying into it. See `agent/versions.md` entry 11 for the
+  detail. Short version: the free tier allows **20 `generateContent` requests
+  per day per model**, the first full dry run burned them and then retried 22
+  files five times each against a quota with a 9.2-hour reset. Transient
+  per-minute limits are still retried; a per-day cap never is.
+
+  Two of the five new tests immediately caught a real bug in the detection
+  itself — the error `@type` is
+  `type.googleapis.com/google.rpc.QuotaFailure`, so splitting on `/` yields
+  `google.rpc.QuotaFailure` and matches nothing, meaning the guard would have
+  silently never fired.
+
+  **This is a product constraint, not just a bug.** At 20 classifications a day
+  the agent cannot organise a Drive of any size. Enabling billing on the Google
+  Cloud project is the real fix.
+
 ## Version 26.10.20-013
 
 **Release Date:** 2026-10-21

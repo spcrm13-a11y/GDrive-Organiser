@@ -22,7 +22,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-VERSION = "10"
+VERSION = "11"
 AGENT_TAG = "MoneypenneyAgent"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Sibling project ainie-knowfind (same taxonomy, mock corpus) runs
@@ -81,6 +81,45 @@ def with_backoff(fn, what, attempts=6):
                 f"({i + 1}/{attempts - 1})")
         time.sleep(delay + random.uniform(0, delay * 0.3))
         delay = min(delay * 2, 60)
+
+
+class QuotaExhausted(Exception):
+    """A daily quota is gone. Retrying is pointless and wastes the next day's
+    budget, so this is deliberately NOT in the retryable path."""
+
+    def __init__(self, quota_id, value, retry_after_s):
+        self.quota_id = quota_id
+        self.value = value
+        self.retry_after_s = retry_after_s
+        super().__init__(f"{quota_id} ({value}/day), retry in {retry_after_s}s")
+
+
+def _classify_429(resp):
+    """Tell a transient rate-limit apart from an exhausted daily quota."""
+    try:
+        err = resp.json().get("error", {})
+    except Exception:
+        return None
+    quota_id, value, delay = None, None, 0
+    for det in err.get("details", []):
+        # "type.googleapis.com/google.rpc.QuotaFailure" -- split on "/" alone
+        # leaves "google.rpc.QuotaFailure", which matches nothing.
+        kind = det.get("@type", "").rsplit(".", 1)[-1]
+        if kind == "QuotaFailure":
+            for v in det.get("violations", []):
+                quota_id = v.get("quotaId", "")
+                value = v.get("quotaValue")
+        elif kind == "RetryInfo":
+            raw = str(det.get("retryDelay", "0s")).rstrip("s")
+            try:
+                delay = int(float(raw))
+            except ValueError:
+                delay = 0
+    # A per-day cap, or any wait longer than a couple of minutes, is not
+    # something a retry loop should sit through.
+    if (quota_id and "PerDay" in quota_id) or delay > 120:
+        return QuotaExhausted(quota_id or "unknown", value, delay)
+    return None
 
 
 def log(msg):
@@ -169,6 +208,10 @@ def call_gemini(api_key, name, snippet=""):
     def _post():
         r = requests.post(url, json=body, timeout=30,
                           headers={"x-goog-api-key": api_key})
+        if r.status_code == 429:
+            fatal = _classify_429(r)
+            if fatal:
+                raise fatal
         if r.status_code in RETRYABLE:
             raise requests.RequestException(f"HTTP {r.status_code}")
         r.raise_for_status()
@@ -178,6 +221,8 @@ def call_gemini(api_key, name, snippet=""):
         resp = _post_with_backoff(_post)
         raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(raw), False
+    except QuotaExhausted:
+        raise
     except Exception as e:
         # Distinct from a genuine low-confidence 'Others' classification.
         log(f"    [!] GEMINI FAILURE for {name!r}: {type(e).__name__}: {e}")
@@ -190,6 +235,8 @@ def _post_with_backoff(fn, attempts=5):
     for i in range(attempts):
         try:
             return fn()
+        except QuotaExhausted:
+            raise                      # never retry an exhausted daily quota
         except requests.RequestException:
             if i == attempts - 1:
                 raise
@@ -298,8 +345,22 @@ def classify_batch(service, api_key, args):
 
     rows, api_failures = [], 0
     for f in files:
-        verdict, failed = call_gemini(api_key, f["name"],
-                                      f.get("description", ""))
+        try:
+            verdict, failed = call_gemini(api_key, f["name"],
+                                          f.get("description", ""))
+        except QuotaExhausted as q:
+            hours = q.retry_after_s / 3600.0
+            log("")
+            log(f"[!] DAILY QUOTA EXHAUSTED after {len(rows)} file(s).")
+            log(f"    {q.quota_id} allows {q.value} request(s) per day for "
+                f"{GEMINI_MODEL}.")
+            log(f"    Resets in about {hours:.1f}h. Stopping now rather than "
+                f"retrying - retries cannot succeed and would only")
+            log(f"    burn into tomorrow's budget. The {len(files) - len(rows)} "
+                f"remaining file(s) were not classified.")
+            log("    Options: enable billing on the Google Cloud project, or "
+                "run smaller batches with --limit.")
+            break
         api_failures += failed
         cat = verdict.get("category", "Others")
         if cat not in CATEGORIES:

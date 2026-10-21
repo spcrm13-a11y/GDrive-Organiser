@@ -264,3 +264,65 @@ class BackoffTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class QuotaTests(unittest.TestCase):
+    """A per-day cap must stop the run, not be retried into the ground."""
+
+    def _resp(self, quota_id, value, delay):
+        r = mock.Mock(status_code=429)
+        r.json.return_value = {"error": {"details": [
+            {"@type": "type.googleapis.com/google.rpc.QuotaFailure",
+             "violations": [{"quotaId": quota_id, "quotaValue": value}]},
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo",
+             "retryDelay": delay},
+        ]}}
+        return r
+
+    def test_per_day_quota_is_fatal(self):
+        r = self._resp("GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                       "20", "33092s")
+        fatal = ad._classify_429(r)
+        self.assertIsInstance(fatal, ad.QuotaExhausted)
+        self.assertEqual(fatal.value, "20")
+        self.assertEqual(fatal.retry_after_s, 33092)
+
+    def test_short_per_minute_limit_stays_retryable(self):
+        r = self._resp("GenerateRequestsPerMinutePerProject", "15", "8s")
+        self.assertIsNone(ad._classify_429(r))
+
+    def test_long_delay_is_fatal_even_without_a_perday_id(self):
+        r = self._resp("SomeOtherQuota", "5", "600s")
+        self.assertIsInstance(ad._classify_429(r), ad.QuotaExhausted)
+
+    def test_backoff_never_retries_an_exhausted_quota(self):
+        calls = {"n": 0}
+
+        def boom():
+            calls["n"] += 1
+            raise ad.QuotaExhausted("PerDay", "20", 33092)
+
+        with mock.patch.object(ad.time, "sleep"):
+            with self.assertRaises(ad.QuotaExhausted):
+                ad._post_with_backoff(boom)
+        self.assertEqual(calls["n"], 1, "quota exhaustion must not be retried")
+
+    def test_batch_stops_at_quota_and_keeps_earlier_rows(self):
+        page = {"files": [{"id": str(i), "name": f"f{i}.pdf", "parents": ["p"]}
+                          for i in range(5)]}
+        f = FakeFiles([page] + [{"files": []}] * len(ad.CATEGORIES))
+        args = mock.Mock(days=425, limit=5, server_filter=False, apply=False)
+
+        seq = [({"category": "Personal", "confidence": 0.9, "reason": "x"}, False),
+               ({"category": "Strategy", "confidence": 0.8, "reason": "y"}, False)]
+
+        def fake_gemini(*a, **k):
+            if seq:
+                return seq.pop(0)
+            raise ad.QuotaExhausted("PerDay", "20", 33092)
+
+        with mock.patch.object(ad, "call_gemini", side_effect=fake_gemini):
+            rows = ad.classify_batch(FakeService(f), "key", args)
+
+        self.assertEqual(len(rows), 2, "rows classified before the quota hit are kept")
+        self.assertEqual(f.update_calls, [], "still a dry run")

@@ -1,5 +1,40 @@
 # versions.md — gdrive-agent (MoneypenneyAgent)
 
+## 11 — 2026-10-21
+
+`[Bug Fix]` Stop the batch when the daily Gemini quota is gone, instead of
+retrying into it.
+
+The first full 25-file dry run classified 3 files and then failed 22 with HTTP
+429. The cause is not rate pacing — it is a hard daily cap:
+
+```
+quotaId:    GenerateRequestsPerDayPerProjectPerModel-FreeTier
+quotaValue: 20
+retryDelay: 33092s   (~9.2 hours)
+```
+
+**20 requests per day, per model, on the free tier.** The backoff added in v01
+made this worse: it retried each of the 22 files five times against a quota
+that could not recover for nine hours.
+
+`_classify_429()` now distinguishes a transient per-minute limit (still
+retried) from an exhausted per-day quota or any `RetryInfo.retryDelay` over two
+minutes (never retried). `QuotaExhausted` propagates out of the retry loop and
+`classify_batch` stops the run, keeps the rows it already classified, and
+reports the quota id, the daily allowance, and the hours until reset.
+
+Five tests added, and two of them immediately caught a real bug: the error
+detail `@type` is `type.googleapis.com/google.rpc.QuotaFailure`, so splitting
+on `/` leaves `google.rpc.QuotaFailure` and never matches `QuotaFailure`. The
+detection would have silently never fired. Split on `.` instead.
+
+Verified against the live API: the agent now stops immediately with an
+actionable message. 21/21 tests pass.
+
+**Operational consequence:** at 20 classifications per day this cannot organise
+a Drive of any size. Billing on the Google Cloud project is the real fix.
+
 ## 10 — 2026-10-21
 
 `[Bug Fix]` / `[Refactor / Maintenance]` First run against real Drive, and two
