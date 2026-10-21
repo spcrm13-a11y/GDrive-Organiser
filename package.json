@@ -1,7 +1,7 @@
 {
-  "name": "ainie-knowfind",
+  "name": "ainie-organizer",
   "private": true,
-  "version": "26.10.20-008",
+  "version": "26.10.20-009",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

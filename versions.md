@@ -10,6 +10,34 @@
 
 ---
 
+## Version 26.10.20-009
+
+**Release Date:** 2026-10-20
+**Status:** Done
+
+- **[User Request] Renamed the npm package to `ainie-organizer`**, finishing
+  the brand rename that `75ddb50` started in the UI and `metadata.json`
+  ("Ainie ORganizer - Autonomous Document Classifier"). npm names must be
+  lowercase, hence `ainie-organizer` rather than the display capitalisation.
+
+  **Only `package.json` `"name"` changed.** Every live identifier containing
+  `knowfind` or `ainie-knowfind` was deliberately left alone, following the
+  same rule applied to DeskInt/spdesk — the product gets renamed, the running
+  identifiers do not:
+
+  - `knowfind.tail2227aa.ts.net` (nginx `server_name`, and the Authentik
+    hostname, which the app standard treats as a permanent choice)
+  - `smartplanet/telemetry/knowfind` and `APP_NAME = 'knowfind'` in `health.ts`
+    — the telemetry listener derives the node from the topic's last segment, so
+    changing it would orphan every historical row in `sp_operations.Telemetry`
+  - container names `ainie-knowfind-app`, `ainie-knowfind-edge`,
+    `knowfind-authentik-outpost`, the `knowfind-tailscale` sidecar (whose
+    hostname is stateful and would be stranded by a rename), and the deploy
+    path `/home/iaadmin/ainie-knowfind`
+
+  Nothing reads `package.json` `"name"` at runtime, so this is cosmetic and
+  deploy-neutral. Verified: `tsc --noEmit` and `vite build` both exit 0.
+
 ## Version 26.10.20-008
 
 **Release Date:** 2026-10-20
