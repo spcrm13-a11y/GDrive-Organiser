@@ -10,6 +10,40 @@
 
 ---
 
+## Version 26.10.20-008
+
+**Release Date:** 2026-10-20
+**Status:** Done
+
+- **[Refactor / Maintenance] Merged the diverged `GDrive-Organiser` history.**
+  A commit made elsewhere on 2026-10-19 (`75ddb50`, "AI chat assistant and
+  brand rename") had branched from `f6feefb`, *before* this repo's deployment
+  and versioning work, so neither side contained the other. It brought
+  `/api/chat`, `ChatbotDrawer`, `VoiceConversationStudio` and a `ws` dependency;
+  it lacked `health.ts`, `docker-compose.yml`, `nginx.conf`, `versions.md` and
+  `src/version.ts` entirely, and had reset `package.json` to
+  `react-example@0.0.0`.
+
+  Resolution kept this repo's identity and release discipline and took their
+  feature work:
+
+  - `package.json` — our name and version, our `mqtt` (**their side had dropped
+    it**, which would have silently killed MQTT telemetry), plus their `ws`,
+    `@types/ws` and `esbuild`.
+  - `server.ts` — their `server.listen` (they wrap express in an `http` server
+    so the Live API websocket can share the port) with our
+    `startTelemetry(Boolean(apiKey))` call preserved inside it. `registerHealth`
+    and `/api/chat` both survive.
+  - `src/version.ts` kept; their branch had deleted it, and `/health` plus the
+    telemetry payload read `APP_VERSION` from it.
+
+  Verified after merging: `tsc --noEmit` exits 0, `vite build` exits 0 and
+  transforms 1673 modules (1671 before, i.e. the new components are included).
+
+  Note: their branch brought a `bun.lock` while local tooling uses npm. Neither
+  lockfile is committed and `Dockerfile` runs plain `npm install`, so the build
+  is unaffected — but the two package managers should be reconciled.
+
 ## Version 26.10.20-007
 
 **Release Date:** 2026-10-20

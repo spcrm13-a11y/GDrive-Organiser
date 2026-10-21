@@ -177,53 +177,53 @@ Balanced Scorecard (BSC) Framework:
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
+      <div className="bg-[#fffcf7] border border-[#e2d8c8] rounded-2xl p-5 shadow-sm text-stone-900">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
                 DEEP INSPECTOR
               </span>
-              <span className="text-xs text-slate-400">Gemini 3.8 Flash • Strict JSON Schema</span>
+              <span className="text-xs text-stone-500">Gemini 3.8 Flash • Strict JSON Schema</span>
             </div>
-            <h2 className="text-lg font-bold text-white tracking-tight">
+            <h2 className="text-lg font-bold text-stone-900 tracking-tight">
               Single Document Autonomous Classifier & Test Bench
             </h2>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-stone-600">
               Inspect document title, snippet, or full content with strict 9-domain classification and Reality Isolation precedence.
             </p>
           </div>
 
           {/* Quick Scenario Buttons */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-slate-400 font-medium mr-1">Test Edge Cases:</span>
+            <span className="text-xs text-stone-600 font-medium mr-1">Test Edge Cases:</span>
             <button
               onClick={() => loadPreset('personal_trap')}
-              className="px-2.5 py-1 text-xs rounded-lg bg-rose-950/60 border border-rose-800/60 text-rose-300 hover:bg-rose-900/60 transition"
+              className="px-2.5 py-1 text-xs rounded-lg bg-rose-100 border border-rose-300 text-rose-800 hover:bg-rose-200 transition"
             >
               GPM311 + Docker (Personal Trap)
             </button>
             <button
               onClick={() => loadPreset('finance_cap')}
-              className="px-2.5 py-1 text-xs rounded-lg bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 hover:bg-emerald-900/60 transition"
+              className="px-2.5 py-1 text-xs rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-800 hover:bg-emerald-200 transition"
             >
               Cap Table / Valuation
             </button>
             <button
               onClick={() => loadPreset('smartplanet_core')}
-              className="px-2.5 py-1 text-xs rounded-lg bg-cyan-950/60 border border-cyan-800/60 text-cyan-300 hover:bg-cyan-900/60 transition"
+              className="px-2.5 py-1 text-xs rounded-lg bg-cyan-100 border border-cyan-300 text-cyan-800 hover:bg-cyan-200 transition"
             >
               SmartPlanet MQTT
             </button>
             <button
               onClick={() => loadPreset('ainie_twin')}
-              className="px-2.5 py-1 text-xs rounded-lg bg-violet-950/60 border border-violet-800/60 text-violet-300 hover:bg-violet-900/60 transition"
+              className="px-2.5 py-1 text-xs rounded-lg bg-violet-100 border border-violet-300 text-violet-800 hover:bg-violet-200 transition"
             >
               Ainie HUD
             </button>
             <button
               onClick={() => loadPreset('masonic_roster')}
-              className="px-2.5 py-1 text-xs rounded-lg bg-blue-950/60 border border-blue-800/60 text-blue-300 hover:bg-blue-900/60 transition"
+              className="px-2.5 py-1 text-xs rounded-lg bg-blue-100 border border-blue-300 text-blue-800 hover:bg-blue-200 transition"
             >
               Masonic Roster
             </button>
@@ -234,10 +234,10 @@ Balanced Scorecard (BSC) Framework:
       {/* Two-Column Layout: Input Form (Left) & Live Classification Output (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: Input Form */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-300 uppercase tracking-wider">
-              <FileText className="w-4 h-4 text-indigo-400" />
+        <div className="bg-[#fffcf7] border border-[#e2d8c8] rounded-2xl p-5 space-y-4 shadow-sm text-stone-900">
+          <div className="flex items-center justify-between pb-3 border-b border-[#e8dfd0]">
+            <div className="flex items-center gap-2 text-xs font-semibold text-stone-700 uppercase tracking-wider">
+              <FileText className="w-4 h-4 text-indigo-600" />
               <span>Document Inspection Payload</span>
             </div>
             <button
@@ -247,14 +247,14 @@ Balanced Scorecard (BSC) Framework:
                 setFullText('');
                 setResult(null);
               }}
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
+              className="text-xs text-stone-500 hover:text-stone-900 flex items-center gap-1"
             >
               <RotateCcw className="w-3 h-3" /> Clear
             </button>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1">
               Document Title / File Name
             </label>
             <input
@@ -262,12 +262,12 @@ Balanced Scorecard (BSC) Framework:
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. GPM311_Freelancer_Income_Tax_Declaration.pdf"
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+              className="w-full px-3 py-2 bg-[#fbf8f2] border border-[#d8cdb8] rounded-xl text-xs text-stone-900 focus:outline-none focus:border-indigo-600 font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1">
               Summary / Snippet
             </label>
             <textarea
@@ -275,12 +275,12 @@ Balanced Scorecard (BSC) Framework:
               value={snippet}
               onChange={(e) => setSnippet(e.target.value)}
               placeholder="Brief overview or metadata snippet..."
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 bg-[#fbf8f2] border border-[#d8cdb8] rounded-xl text-xs text-stone-900 focus:outline-none focus:border-indigo-600"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700 mb-1">
               Full Document Text / Content Stream
             </label>
             <textarea
@@ -288,13 +288,13 @@ Balanced Scorecard (BSC) Framework:
               value={fullText}
               onChange={(e) => setFullText(e.target.value)}
               placeholder="Full text extracted from PDF, DOCX, or Google Doc..."
-              className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="w-full px-3 py-2 bg-[#fbf8f2] border border-[#d8cdb8] rounded-xl text-xs font-mono text-stone-900 focus:outline-none focus:border-indigo-600"
             />
           </div>
 
           {error && (
-            <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <div className="p-3 rounded-xl bg-rose-100 border border-rose-300 text-rose-800 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{error}</span>
             </div>
           )}
@@ -302,7 +302,7 @@ Balanced Scorecard (BSC) Framework:
           <button
             onClick={handleClassify}
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition disabled:opacity-50"
+            className="w-full py-3 bg-[#0f2142] hover:bg-[#18315c] text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4" />
             {loading ? 'Evaluating with Gemini 3.8 Flash...' : 'Run Autonomous Classification'}
@@ -315,16 +315,16 @@ Balanced Scorecard (BSC) Framework:
             <div className="space-y-4 animate-fade-in">
               {/* Reality Isolation Alert Banner */}
               {result.reality_isolation_triggered && (
-                <div className="bg-rose-950/70 border border-rose-800/80 rounded-2xl p-4 text-rose-200 shadow-lg shadow-rose-950/30">
+                <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 text-rose-900 shadow-sm">
                   <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-rose-200 border border-rose-300 flex items-center justify-center text-rose-700 shrink-0">
                       <ShieldAlert className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-rose-300 uppercase tracking-wide">
+                      <h4 className="text-sm font-bold text-rose-800 uppercase tracking-wide">
                         Reality Isolation Protocol Activated
                       </h4>
-                      <p className="text-xs text-rose-200/90 mt-1 leading-relaxed">
+                      <p className="text-xs text-rose-700 mt-1 leading-relaxed">
                         Personal tax, identity, medical, travel, or utility records detected. Under the core directive,
                         <strong> "Personal" takes absolute precedence over all other categories</strong>, overriding any business or technical elements.
                       </p>
@@ -335,19 +335,19 @@ Balanced Scorecard (BSC) Framework:
 
               {/* Classification Category Card */}
               <div
-                className={`border rounded-2xl p-5 ${
-                  domainMeta ? domainMeta.color.border : 'border-slate-800'
-                } ${domainMeta ? domainMeta.color.bg : 'bg-slate-900/60'}`}
+                className={`border rounded-2xl p-5 shadow-sm bg-white ${
+                  domainMeta ? domainMeta.color.border : 'border-[#e2d8c8]'
+                }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
+                  <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
                     Target Operational Domain
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-950/60 border border-slate-800 text-slate-400">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#f4efe6] border border-[#d8cdb8] text-stone-600">
                       Engine: {result.engineUsed}
                     </span>
-                    <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-full">
                       Confidence: {Math.round(result.confidence * 100)}%
                     </span>
                   </div>
@@ -355,41 +355,41 @@ Balanced Scorecard (BSC) Framework:
 
                 <div className="flex items-center gap-3 mb-2">
                   {isPersonal ? (
-                    <ShieldAlert className="w-6 h-6 text-rose-400" />
+                    <ShieldAlert className="w-6 h-6 text-rose-600" />
                   ) : (
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
                   )}
-                  <h3 className="text-2xl font-bold text-white tracking-tight">
+                  <h3 className="text-2xl font-bold text-stone-900 tracking-tight">
                     {result.category}
                   </h3>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-stone-600 leading-relaxed">
                   {domainMeta?.description}
                 </p>
               </div>
 
               {/* Rationale Section */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <div className="bg-[#fffcf7] border border-[#e2d8c8] rounded-2xl p-5 shadow-sm text-stone-900">
+                <h4 className="text-xs font-semibold text-stone-600 uppercase tracking-wider mb-2">
                   Classification Rationale (Max 2 Sentences)
                 </h4>
-                <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs text-slate-200 italic leading-relaxed">
+                <div className="p-3 rounded-xl bg-[#f8f4ec] border border-[#e2d8c8] text-xs text-stone-800 italic leading-relaxed">
                   "{result.reason}"
                 </div>
               </div>
 
               {/* Semantic Filter Tags */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-2">
-                  <Tag className="w-3.5 h-3.5 text-indigo-400" />
+              <div className="bg-[#fffcf7] border border-[#e2d8c8] rounded-2xl p-5 shadow-sm text-stone-900">
+                <h4 className="text-xs font-semibold text-stone-600 uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                  <Tag className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Semantic Tags for Secondary Filtering (2-4 Tags)</span>
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {result.tags?.map((tag: string, idx: number) => (
                     <span
                       key={idx}
-                      className="px-3 py-1 rounded-xl text-xs font-medium bg-indigo-950/60 text-indigo-300 border border-indigo-800/60"
+                      className="px-3 py-1 rounded-xl text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200"
                     >
                       #{tag}
                     </span>
@@ -410,10 +410,10 @@ Balanced Scorecard (BSC) Framework:
               />
             </div>
           ) : (
-            <div className="bg-slate-900/40 border border-dashed border-slate-800 rounded-2xl p-12 text-center h-full flex flex-col items-center justify-center">
-              <Sparkles className="w-12 h-12 text-slate-600 mb-3" />
-              <h3 className="text-sm font-semibold text-slate-300">Ready for Autonomous Inspection</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-xs">
+            <div className="bg-[#fffcf7] border border-dashed border-[#d8cdb8] rounded-2xl p-12 text-center h-full flex flex-col items-center justify-center shadow-sm">
+              <Sparkles className="w-12 h-12 text-stone-400 mb-3" />
+              <h3 className="text-sm font-semibold text-stone-800">Ready for Autonomous Inspection</h3>
+              <p className="text-xs text-stone-500 mt-1 max-w-xs">
                 Select a preset test case or enter a document title/snippet on the left, then click "Run Autonomous Classification".
               </p>
             </div>

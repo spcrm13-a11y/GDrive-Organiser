@@ -9,12 +9,17 @@ import { RealityIsolationAuditView } from './components/RealityIsolationAuditVie
 import { TaxonomyReferenceView } from './components/TaxonomyReferenceView';
 import { DocumentDetailModal } from './components/DocumentDetailModal';
 import { NewDocModal } from './components/NewDocModal';
+import { ChatbotDrawer } from './components/ChatbotDrawer';
+import { VoiceConversationStudio } from './components/VoiceConversationStudio';
+import { Bot, Sparkles, Radio } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'workspace' | 'inspector' | 'audit' | 'taxonomy'>('workspace');
   const [documents, setDocuments] = useState<DocumentItem[]>(SAMPLE_DOCUMENTS);
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null);
   const [isNewDocModalOpen, setIsNewDocModalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isVoiceStudioOpen, setIsVoiceStudioOpen] = useState(false);
   const [isClassifyingSingle, setIsClassifyingSingle] = useState(false);
   const [isBatchClassifying, setIsBatchClassifying] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
@@ -155,7 +160,7 @@ export default function App() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
+    <div className="min-h-screen bg-[#f4efe6] text-stone-900 font-sans flex flex-col selection:bg-amber-200">
       {/* Toast Notification Banner */}
       {notification && (
         <div className="fixed bottom-6 right-6 z-50 bg-indigo-950/95 border border-indigo-700/80 text-indigo-200 px-4 py-3 rounded-xl shadow-2xl text-xs font-medium flex items-center gap-2 animate-bounce">
@@ -171,6 +176,9 @@ export default function App() {
         realityIsolationCount={realityIsolationCount}
         totalDocs={documents.length}
         classifiedCount={documents.filter((d) => d.status === 'classified').length}
+        onToggleChat={() => setIsChatOpen(!isChatOpen)}
+        isChatOpen={isChatOpen}
+        onOpenVoice={() => setIsVoiceStudioOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -206,6 +214,53 @@ export default function App() {
         {activeTab === 'taxonomy' && <TaxonomyReferenceView />}
       </main>
 
+      {/* Floating Gemini Live Voice Launcher */}
+      <button
+        onClick={() => setIsVoiceStudioOpen(true)}
+        className="fixed bottom-6 left-6 z-40 px-4 py-3 bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-semibold rounded-2xl shadow-xl shadow-cyan-900/30 flex items-center gap-2.5 hover:scale-105 active:scale-95 transition-all group border border-cyan-400/30"
+        title="Open Real-Time Voice Conversation (gemini-3.8-live)"
+      >
+        <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center">
+          <Radio className="w-3.5 h-3.5 text-cyan-200 animate-pulse" />
+        </div>
+        <div className="text-left">
+          <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
+            <span>Live Voice</span>
+            <span className="px-1 py-0.2 bg-white/20 text-[9px] rounded font-mono">3.8-live</span>
+          </div>
+          <div className="text-[10px] text-cyan-100/80 leading-none">Voice Conversation</div>
+        </div>
+      </button>
+
+      {/* Floating Gemini Copilot Launcher */}
+      {!isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 z-40 px-4 py-3 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-semibold rounded-2xl shadow-xl shadow-indigo-600/30 flex items-center gap-2.5 hover:scale-105 active:scale-95 transition-all group border border-indigo-400/30"
+          title="Open Gemini AI Classifier Copilot"
+        >
+          <Bot className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+          <div className="text-left">
+            <div className="text-xs font-bold leading-tight">Gemini Copilot</div>
+            <div className="text-[10px] text-indigo-200/80 leading-none">Chat with AI</div>
+          </div>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1"></span>
+        </button>
+      )}
+
+      {/* Chatbot Drawer */}
+      <ChatbotDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        onOpenVoice={() => setIsVoiceStudioOpen(true)}
+      />
+
+      {/* Real-Time Live Voice Conversation Studio (gemini-3.8-live) */}
+      <VoiceConversationStudio
+        isOpen={isVoiceStudioOpen}
+        onClose={() => setIsVoiceStudioOpen(false)}
+      />
+
       {/* Modals */}
       <DocumentDetailModal
         document={selectedDocument}
@@ -221,7 +276,7 @@ export default function App() {
       />
 
       {/* Subtle Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-500">
+      <footer className="border-t border-[#e2d8c8] bg-[#ebe3d5] py-4 text-center text-xs text-stone-600">
         Autonomous Document Classifier & Workspace Organizer • 9-Domain Governance with Reality Isolation Precedence
       </footer>
     </div>
