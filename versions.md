@@ -10,6 +10,21 @@
 
 ---
 
+## Version 26.10.20-011
+
+**Release Date:** 2026-10-21
+**Status:** Done
+
+- **[Refactor / Maintenance] Removed `bun.lock`.** `75ddb50` brought it from a
+  bun-based environment, leaving two lockfiles for two package managers in one
+  repo. Nothing referenced bun — not `Dockerfile`, `docker-compose.yml`, the
+  `deploy/` scripts, nor any npm script — and the image builds with
+  `npm install`, so only `package-lock.json` ever affected the build. The bun
+  lockfile was 671 lines of state that could silently disagree with the npm one.
+
+  npm is now the single package manager of record. Verified after removal:
+  `tsc --noEmit` and `vite build` both exit 0, 1673 modules transformed.
+
 ## Version 26.10.20-010
 
 **Release Date:** 2026-10-20

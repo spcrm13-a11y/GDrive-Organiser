@@ -1,7 +1,7 @@
 {
   "name": "ainie-organizer",
   "private": true,
-  "version": "26.10.20-010",
+  "version": "26.10.20-011",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
