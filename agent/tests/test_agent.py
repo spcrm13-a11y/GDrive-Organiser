@@ -549,3 +549,64 @@ class CoercionTests(unittest.TestCase):
                                               "reason": "r"}, False)):
             rows = ad.classify_batch(FakeService(f), "k", args)
         self.assertEqual(rows[0]["confidence"], 0.9)
+
+
+class ReviewGateTests(unittest.TestCase):
+    """Personal, title-only and failed verdicts must never move on their own."""
+
+    def _row(self, **kw):
+        base = {"file_id": "1", "name": "f", "original_parents": ["p"],
+                "target_category": "Strategy", "target_folder_id": "cat",
+                "confidence": 0.9, "reason": "r", "api_failed": False,
+                "title_only": False}
+        base.update(kw)
+        return base
+
+    def test_personal_is_held(self):
+        auto, held = ad.partition_for_review([self._row(target_category="Personal")])
+        self.assertEqual(auto, [])
+        self.assertIn("Personal", held[0]["hold_reason"])
+
+    def test_title_only_is_held_even_for_a_safe_category(self):
+        auto, held = ad.partition_for_review([self._row(title_only=True)])
+        self.assertEqual(auto, [])
+        self.assertIn("filename guess", held[0]["hold_reason"])
+
+    def test_backend_failure_is_held(self):
+        auto, held = ad.partition_for_review([self._row(api_failed=True)])
+        self.assertEqual(auto, [])
+
+    def test_a_clean_verdict_passes_through(self):
+        auto, held = ad.partition_for_review([self._row()])
+        self.assertEqual(len(auto), 1)
+        self.assertEqual(held, [])
+
+    def test_apply_moves_only_the_unheld_rows(self):
+        tmp = tempfile.mkdtemp()
+        rows = [self._row(file_id="ok", name="safe"),
+                self._row(file_id="p", name="tax", target_category="Personal"),
+                self._row(file_id="t", name="guess", title_only=True)]
+        auto, held = ad.partition_for_review(rows)
+        f = FakeFiles()
+        with mock.patch.object(ad, "BASE", tmp):
+            ad.apply_batch(FakeService(f), auto)
+        moved = [c["fileId"] for c in f.update_calls]
+        self.assertEqual(moved, ["ok"])
+        self.assertEqual(len(held), 2)
+
+    def test_review_list_names_every_held_file(self):
+        tmp = tempfile.mkdtemp()
+        _, held = ad.partition_for_review(
+            [self._row(name="tax.pdf", target_category="Personal")])
+        with mock.patch.object(ad, "BASE", tmp):
+            path = ad.write_review_list(held, tag="t")
+        body = open(path).read()
+        self.assertIn("tax.pdf", body)
+        self.assertIn("Personal", body)
+
+    def test_review_list_survives_a_string_confidence(self):
+        tmp = tempfile.mkdtemp()
+        _, held = ad.partition_for_review(
+            [self._row(target_category="Personal", confidence="High")])
+        with mock.patch.object(ad, "BASE", tmp):
+            ad.write_review_list(held, tag="t2")   # must not raise

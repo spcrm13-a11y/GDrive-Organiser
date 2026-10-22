@@ -16,6 +16,29 @@
 
 ---
 
+## Version 26.10.22-018
+
+**Release Date:** 2026-10-22
+**Status:** Done
+
+- **[User Request] The agent will not file anything into `Personal` on its
+  own.** Full reasoning in `agent/versions.md` entry 16.
+
+  Three dry runs over the same 12 real files showed prompt tuning fixing one
+  case and breaking another each time, with every misclassification being a
+  false-positive `Personal`. Making the rule more explicit made the model
+  *more* confident about the wrong answer (95% -> 98%), and the same file
+  classified differently across runs at `temperature 0.1` — so part of this is
+  7B instability, not a prompt defect.
+
+  The gate is therefore structural, not another prompt tweak. `--apply` holds
+  `Personal` verdicts, verdicts reached with no readable text, and backend
+  failures in `reports/review-*.md` and moves nothing else. Dry runs now
+  preview the same split, so you can see what would be held before running it.
+
+  `Personal` is both where the errors concentrate and where a misfile costs
+  most — it is tax, medical and identity records.
+
 ## Version 26.10.22-017
 
 **Release Date:** 2026-10-22

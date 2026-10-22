@@ -1,5 +1,38 @@
 # versions.md — gdrive-agent (MoneypenneyAgent)
 
+## 16 — 2026-10-22
+
+`[User Request]` **The agent will not move a `Personal` verdict on its own.**
+
+Evidence from three dry runs over the same 12 real files: prompt tuning fixed
+one case and broke another each time, and the misclassifications were *all*
+false-positive `Personal`:
+
+| file | with content | after sharpening the rule |
+|---|---|---|
+| `define the api` | AI Code Development 95% | **Others 95%** (regressed) |
+| `steuerT-spec1` | Personal 95% | **Personal 98%** (worse) |
+| `GDRive Xfer` | Personal 95% | AI Code Development 85% (fixed) |
+
+Writing a more explicit "Personal means your own records" rule made the model
+*more* confident about the wrong answer. The same file also classified
+differently across runs at `temperature 0.1`, so some of this is 7B
+instability rather than anything a prompt can fix.
+
+So the gate is structural rather than another prompt tweak. `--apply` now
+partitions the batch:
+
+- `Personal` verdicts — where errors concentrate **and** where a misfile costs
+  most, since these are tax, medical and identity records
+- `title_only` verdicts — no document was ever read
+- backend failures — not a verdict at all
+
+go to `reports/review-*.md` and are **not moved**. Everything else moves as
+before. `--include-personal` overrides the first rule for anyone who wants it;
+title-only and failed rows are never auto-moved regardless.
+
+Seven tests. 55 total.
+
 ## 15 — 2026-10-22
 
 `[Bug Fix]` A single untrusted field killed an entire run.

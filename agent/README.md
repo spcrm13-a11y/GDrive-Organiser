@@ -4,7 +4,7 @@ Classifies Google Drive files into nine categories with Gemini and files them
 into root-level folders. **Dry-run by default — it changes nothing unless you
 pass `--apply`.**
 
-Version: see [`versions.md`](versions.md). Current: **15**.
+Version: see [`versions.md`](versions.md). Current: **16**.
 
 ## Where it runs
 
@@ -100,6 +100,12 @@ any move, and that `--revert` restores the original parents exactly.
 
 ## Safety properties
 
+- **`Personal` verdicts are never moved automatically.** They go to
+  `reports/review-*.md` for you to action. That is where the classifier's
+  errors concentrate and where a misfile costs most — tax, medical and
+  identity records. `--include-personal` overrides this.
+- **Verdicts with no readable text are never moved**, whatever confidence the
+  model reports. Drive cannot export Sites, Forms or most binary types.
 - No mutation path is reachable without `--apply`.
 - Every move is recorded to an fsynced ledger **before** it happens.
 - Already-processed files are skipped via `appProperties.processed_by`.

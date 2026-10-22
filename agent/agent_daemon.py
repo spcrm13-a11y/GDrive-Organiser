@@ -22,8 +22,14 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-VERSION = "15"
+VERSION = "16"
 AGENT_TAG = "MoneypenneyAgent"
+
+# Verdicts the agent will never act on by itself. 'Personal' is where the
+# classifier's errors concentrate AND where a misfile costs most -- it is tax,
+# medical and identity records. A title-only verdict read no document at all.
+# Both go to a review list instead of being moved.
+HOLD_CATEGORY = "Personal"
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 # Sibling project ainie-knowfind (same taxonomy, mock corpus) runs
 # gemini-3.8-flash. Override here rather than editing the source.
@@ -557,6 +563,42 @@ def write_report(rows, args):
     return jpath
 
 
+def partition_for_review(rows):
+    """Split auto-movable rows from ones a human must confirm."""
+    auto, held = [], []
+    for r in rows:
+        why = None
+        if r["target_category"] == HOLD_CATEGORY:
+            why = f"classified {HOLD_CATEGORY}"
+        elif r.get("title_only"):
+            why = "no readable text - filename guess"
+        elif r.get("api_failed"):
+            why = "backend failure, not a real verdict"
+        if why:
+            held.append({**r, "hold_reason": why})
+        else:
+            auto.append(r)
+    return auto, held
+
+
+def write_review_list(held, tag=None):
+    """The held rows, as a file you can read and act on."""
+    os.makedirs(os.path.join(BASE, "reports"), exist_ok=True)
+    path = os.path.join(BASE, "reports", f"review-{tag or stamp()}.md")
+    with open(path, "w") as fh:
+        fh.write(f"# Needs your review - {len(held)} file(s)\n\n")
+        fh.write("The agent did **not** move these. Each either landed in "
+                 f"`{HOLD_CATEGORY}`, was classified without readable text, or "
+                 "came from a backend failure.\n\n")
+        for r in held:
+            fh.write(f"- `{r['name']}`\n"
+                     f"  - proposed: **{r['target_category']}** "
+                     f"({coerce_confidence(r['confidence']) * 100:.0f}%)\n"
+                     f"  - held because: {r['hold_reason']}\n"
+                     f"  - reason given: {r['reason']}\n")
+    return path
+
+
 def apply_batch(service, rows):
     """Reparent + tag. Writes the reversal ledger BEFORE each mutation."""
     os.makedirs(os.path.join(BASE, "ledger"), exist_ok=True)
@@ -636,6 +678,10 @@ def main():
                    help="max files per batch (default 25)")
     p.add_argument("--days", type=int, default=425,
                    help="modifiedTime lookback window (default 425)")
+    p.add_argument("--include-personal", action="store_true",
+                   help=f"also move files classified {HOLD_CATEGORY}. Off by "
+                        f"default: that is where misclassifications "
+                        f"concentrate and where they cost most.")
     p.add_argument("--snippet-chars", type=int, default=4000,
                    help="characters of document text to classify on "
                         "(default 4000; 0 = filename and description only)")
@@ -666,9 +712,29 @@ def main():
     if not rows:
         return
     if args.apply:
-        apply_batch(service, rows)
+        auto, held = partition_for_review(rows)
+        if held:
+            path = write_review_list(held)
+            log(f"[?] HELD {len(held)} file(s) for your review - not moved.")
+            for r in held:
+                log(f"    - {r['name']!r}: {r['hold_reason']}")
+            log(f"    {path}")
+        if args.include_personal:
+            log(f"[!] --include-personal: moving {HOLD_CATEGORY} verdicts too.")
+            auto = [r for r in rows if not r.get("title_only")
+                    and not r.get("api_failed")]
+        if not auto:
+            log("[v] Nothing left to move automatically.")
+            return
+        apply_batch(service, auto)
     else:
         write_report(rows, args)
+        auto, held = partition_for_review(rows)
+        log(f"[i] --apply would move {len(auto)} file(s) and HOLD {len(held)} "
+            f"for review.")
+        if held:
+            path = write_review_list(held)
+            log(f"    Held: {path}")
         log("[i] Nothing was changed. Review the report, then re-run with "
             "--apply to execute.")
 
